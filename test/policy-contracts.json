@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "cases": [
+    {"kind":"person","value":"opaque-id_1==","valid":true},
+    {"kind":"person","value":"me","valid":false},
+    {"kind":"person","value":"not an ID","valid":false},
+    {"kind":"person","value":"name@example.invalid","valid":false},
+    {"kind":"title","value":"Planning résumé 😀","valid":true},
+    {"kind":"title","value":" Label","valid":false},
+    {"kind":"title","value":"Label\nsecond line","valid":false},
+    {"kind":"title","value":"Invisible\u200btitle","valid":false},
+    {"kind":"title","value":"","valid":false},
+    {"kind":"query","value":"Al","valid":true},
+    {"kind":"query","value":"名😀","valid":true},
+    {"kind":"query","value":"A","valid":false},
+    {"kind":"query","value":"Al*","valid":false},
+    {"kind":"query","value":" Al","valid":false},
+    {"kind":"description","value":"Exact raw\nSecond line 😀","valid":true},
+    {"kind":"description","value":"","valid":true},
+    {"kind":"description","value":"Tabs\tare refused","valid":false},
+    {"kind":"description","value":"No\rCR","valid":false},
+    {"kind":"description","value":"Hidden\u202econtrol","valid":false},
+    {"kind":"drafts","value":[{"roomId":"r","parentId":"root","text":"Exact\n😀","format":"markdown","uncertain":true}],"valid":true},
+    {"kind":"drafts","value":[{"roomId":"r","text":"Text","format":"html","uncertain":false}],"valid":false},
+    {"kind":"drafts","value":[{"roomId":"r","text":"Text","format":"plain","uncertain":false,"token":"FORBIDDEN"}],"valid":false}
+  ]
+}

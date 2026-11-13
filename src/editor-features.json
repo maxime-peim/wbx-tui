@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "capabilityLimit": 32,
+  "lifecycle": {"transport": "clear", "session": "retain"},
+  "capabilities": [
+    "messaging", "message-replies", "oauth-config", "meeting-tmux", "meeting-panes-v1", "delivery-resolution-v1",
+    "editor-fallback", "people-status", "upcoming-meetings", "spaces-cache", "same-space-resume", "message-images",
+    "image-opening", "message-attachments", "attachment-typed-open-v1", "attachment-chunks-v1",
+    "notification-previews", "sender-names-v1", "local-sections-v1", "uploads-v1", "message-actions-v1",
+    "markdown-send-v1", "room-members-v1", "conversations-v1", "memberships-write-v1", "server-teams-v1",
+    "local-context-v1", "directory-search-v1", "message-queries-v1", "people-profile-v1", "adaptive-card-text-v1", "joined-teams-v1"
+  ],
+  "capabilityDependencies": {"attachment-chunks-v1": ["attachment-typed-open-v1"]},
+  "features": {
+    "messageReaders": {
+      "watermark-v1": {"capabilities": ["messaging", "local-context-v1"]},
+      "seen-events-v1": {"capabilities": ["messaging", "local-context-v1"]}
+    },
+    "attachmentMetadata": {"headers-v1": {"capabilities": ["messaging", "message-attachments"]}},
+    "messageReactions": {
+      "pinned-internal-v1": {"capabilities": ["messaging", "message-actions-v1", "local-context-v1"]},
+      "viewport-batch-v1": {"capabilities": ["messaging", "message-actions-v1", "local-context-v1"]},
+      "self-summary-v1": {"capabilities": ["messaging", "message-actions-v1", "local-context-v1"]},
+      "progressive-v1": {"capabilities": ["messaging", "message-actions-v1", "local-context-v1"]},
+      "actor-details-v1": {"capabilities": ["messaging", "message-actions-v1", "local-context-v1"]}
+    },
+    "uploadFormats": {
+      "markdown-single-file-v1": {"capabilities": ["uploads-v1", "markdown-send-v1", "local-context-v1"]}
+    },
+    "directFormats": {
+      "markdown-v1": {"capabilities": ["conversations-v1", "local-context-v1", "markdown-send-v1"]},
+      "single-file-v1": {"capabilities": ["conversations-v1", "local-context-v1", "uploads-v1"]},
+      "markdown-single-file-v1": {"capabilities": ["conversations-v1", "local-context-v1", "markdown-send-v1", "uploads-v1"]}
+    },
+    "spaceActions": {"rename-v1": {"capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"]}},
+    "spaceDescriptions": {"replace-v1": {"capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"]}},
+    "spaceLocks": {"lock-unlock-v1": {"capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"]}},
+    "spaceAnnouncements": {"enable-disable-v1": {"capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"]}},
+    "spaceDescriptionClears": {"single-space-v1": {
+      "capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"], "features": {"spaceDescriptions": ["replace-v1"]}
+    }},
+    "membershipVisibility": {"own-direct-v1": {"capabilities": ["conversations-v1", "room-members-v1", "local-context-v1"]}},
+    "teamActions": {"rename-v1": {"capabilities": ["conversations-v1", "joined-teams-v1", "local-context-v1"]}},
+    "teamDescriptions": {"replace-v1": {"capabilities": ["conversations-v1", "joined-teams-v1", "local-context-v1"]}},
+    "peopleSpaces": {"visible-v1": {"capabilities": ["people-status", "local-context-v1"]}},
+    "peopleViewport": {"paged-v1": {"capabilities": [], "features": {"peopleSpaces": ["visible-v1"]}}},
+    "localDrafts": {"disk-v1": {"capabilities": ["local-context-v1"]}}
+  }
+}

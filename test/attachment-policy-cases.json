@@ -1,0 +1,11 @@
+[
+  {"name":"attachment","key":"."},
+  {"name":"file.","key":"."},
+  {"name":"Picture.PNG","key":".png"},
+  {"name":"Archive.tar.gz","key":".gz"},
+  {"name":"file..PY","key":".py"},
+  {"name":"one.two three","key":".two three"},
+  {"name":"a._-","key":"._-"},
+  {"name":"a. ","key":". "},
+  {"name":"a.a b_9","key":".a b_9"}
+]

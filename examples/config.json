@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "leader": " ",
+  "layout": "desk",
+  "renderer": "auto",
+  "fallback": "blocks",
+  "fps": 15,
+  "demoParticipants": 4,
+  "tmux": { "appearance": "inherit" },
+  "theme": {
+    "background": "#10141c",
+    "foreground": "#d8e2f0",
+    "muted": "#8192aa",
+    "accent": "#72c7cf",
+    "border": "#344153",
+    "focus": "#72c7cf",
+    "warning": "#f2bf71"
+  },
+  "keybindings": {
+    "c": null,
+    "<leader> c": "camera.toggle",
+    "<leader> f": ["layout speaker", "pane.maximize"],
+    "<leader> v": "pane.split.vertical",
+    "<leader> s": "pane.split.horizontal",
+    "<leader> t": "tmux.open",
+    "<leader> d": "layout desk"
+  },
+  "layouts": {
+    "desk": {
+      "direction": "vertical",
+      "ratio": 0.65,
+      "children": [
+        { "source": "video", "title": "Main stage" },
+        {
+          "direction": "horizontal",
+          "ratio": 0.5,
+          "children": [
+            { "source": "mock-2" },
+            { "source": "mock-3" }
+          ]
+        }
+      ]
+    }
+  }
+}

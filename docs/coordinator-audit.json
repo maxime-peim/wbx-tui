@@ -1,0 +1,683 @@
+{
+  "version": 1,
+  "scope": "All declared fields (including constructor parameter properties), methods and module functions in EditorEngine and EditorRPC, all native coordinator script bindings/functions and its event payload global. Snapshot members are projections, not extra stores. Delegated owner internals are not re-inventoried.",
+  "sources": [
+    {"path": "src/editor-engine.ts", "class": "EditorEngine"},
+    {"path": "src/editor-worker.ts", "class": "EditorRPC"},
+    {"path": "autoload/wbx.vim", "class": null}
+  ],
+  "responsibilities": [
+    {
+      "id": "E-compose", "source": "src/editor-engine.ts",
+      "owner": "EditorEngine constructs existing concrete owners; backend-providers supplies defaults",
+      "decision": "keep", "reason": "A composition root is intentional; factories are not another service registry.",
+      "fields": [
+        {"names": ["openBrowser", "authorization", "spacesCache", "owners"], "lifetime": "Constructor injection, engine lifetime; no per-session credential authority. Do not mutate installed configuration."},
+        {"names": ["publicREST", "actionREST"], "lifetime": "Engine-lifetime shared physical REST admission. Logical reset/abort never proves HTTP/socket settlement; demo routing does not replace the live owner."}
+      ],
+      "methods": ["constructor"],
+      "invalidation": ["startIntent captures generation and creates per-session providers", "stopSession/failed reset logical consumers; PublicREST retains its physical busy/settled proof"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "await this.engine.startSession(p)"},
+        {"file": "src/backend-providers.ts", "contains": "composeBackendProviders"},
+        {"file": "src/public-rest.ts", "contains": "settled"}
+      ],
+      "failure": "Constructor/provider failures become sanitized startup failure; no fallback to a live/demo substitute or automatic mutation retry.",
+      "positive": [{"file": "test/backend-providers-integration.test.ts", "contains": "ordinary provider RPC startup and renewal preserve distinct source lifetimes"}],
+      "recovery": [{"file": "test/backend-providers-integration.test.ts", "contains": "startup failure closes owners and explicit restart recovers"}],
+      "limits": ["Injection/HTTP contracts, not installed SDK/device/live acceptance."], "checklist": []
+    },
+    {
+      "id": "E-session", "source": "src/editor-engine.ts",
+      "owner": "EditorEngine application session and OAuth admission; OAuthSession owns renewal timers and credentials exchange",
+      "decision": "keep", "reason": "One application generation and one local UI session fence serve different purposes; neither is a verified storage identity.",
+      "fields": [
+        {"names": ["oauth", "abort", "token", "expiresAt", "grantedScope", "renewing"], "lifetime": "Created/adopted during live start; refresh coalesces via renewing; failed closes OAuth/clears token and expiry but retains grant/session metadata inert behind failed state; stop clears credentials, grant, renewing and shared signal. Old renewal completion checks captured generation."},
+        {"names": ["generation", "localSession"], "lifetime": "stopSession increments generation and clears localSession; startIntent creates random UI session. failed does not increment generation: state/owner predicates make consumers inactive until explicit stop/start."},
+        {"names": ["mode", "state", "auth", "config"], "lifetime": "Defaults then accepted startup intent. Existing ready session rejects changed mode/config/features. failed publishes failed; stop publishes idle. Config path persists as configuration, not account identity."}
+      ],
+      "methods": ["start", "startSession", "startIntent", "failed", "refreshAuth", "connected", "stop", "stopSession"],
+      "invalidation": ["startup cancellation/generation replacement", "OAuth authorize/refresh failure or expiry invokes failed", "explicit session.stop/shutdown invokes stopSession(true)", "start from failed calls stopSession before replacement"],
+      "trace": [
+        {"file": "src/editor-protocol.ts", "contains": "session.start"},
+        {"file": "src/editor-worker.ts", "contains": "case 'auth.refresh'"},
+        {"file": "src/oauth.ts", "contains": "watch("},
+        {"file": "autoload/wbx.vim", "contains": "function! s:apply(state)"}
+      ],
+      "failure": "Connection/OAuth diagnostics are sanitized, ready admission closes, optional consumers stop; explicit restart is separate from renewing credentials or resolving uncertain writes.",
+      "positive": [{"file": "test/backend-providers-integration.test.ts", "contains": "ordinary provider RPC startup and renewal preserve distinct source lifetimes"}],
+      "recovery": [
+        {"file": "test/backend-providers-integration.test.ts", "contains": "startup failure closes owners and explicit restart recovers"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "application failure relies on inactive state/closed owners, not a new generation"}
+      ],
+      "limits": ["C3's 36-cell matrix holds storage, content and a submitted metadata/upload write concurrently. It covers partial settlement while failed/idle before restart, and all consumers held into account replacement. Boundary-controlled transport/storage lifetime evidence is not a live OAuth or OS crash-consistency claim."],
+      "checklist": ["C3"]
+    },
+    {
+      "id": "E-projection", "source": "src/editor-engine.ts",
+      "owner": "EditorEngine assembles detached application snapshots; feature owners supply their own projections",
+      "decision": "keep", "reason": "A publication boundary is necessary; no broad snapshot cache or extra feature timer belongs here.",
+      "fields": [
+        {"names": ["revision"], "lifetime": "Engine-lifetime monotonic publication number, not a session ID. publish increments; snapshot never increments."},
+        {"names": ["notice"], "lifetime": "Bounded application diagnostic set by failure, cleared by start/stop; store notice is fallback display, not authority."}
+      ],
+      "methods": ["snapshot", "publish"],
+      "invalidation": ["Every publication revalidates attachment transfer and reconciles agenda before assembling current state", "native revision admission rejects old state", "time-sensitive presentation is deliberately not whole-state memoized"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "const lane = editorStateLane(state)"},
+        {"file": "src/state-output.ts", "contains": "Unknown fields are conservative barriers"},
+        {"file": "autoload/wbx.vim", "contains": "get(a:state, 'revision', -1) <="}
+      ],
+      "failure": "Do not diagnose a missing update from revision/count alone: inspect owner event, lane barrier, native admission and annotation guard. Snapshot getters must not perform reads or change ownership.",
+      "positive": [{"file": "test/editor.test.ts", "contains": "each real state publication projects once"}],
+      "recovery": [{"file": "test/read-status-cache.test.ts", "contains": "identical SDK observations avoid projection/merge work"}],
+      "limits": ["Field projection inventory below is checked statically; a cited test is not branch coverage for every field."], "checklist": []
+    },
+    {
+      "id": "E-store", "source": "src/editor-engine.ts",
+      "owner": "MessagingStore owns room/history/selection/revocation data; engine supplies current-store/session fencing and cross-domain invalidation",
+      "decision": "keep", "reason": "Store callbacks coordinate existing owners; no duplicate room/message registry is retained in the engine.",
+      "fields": [{"names": ["store"], "lifetime": "Created once per started session, callbacks capture generation/store. failed/stop close and unset. Normal select changes store conversation ownership, not application generation."}],
+      "methods": ["rooms", "select", "history", "revokeRoomState"],
+      "invalidation": ["select resets message query slots and pauses optional presence", "exact access loss/room-revoked forgets read/unread/cache/upload state, selected roster/presence and notifies native before store revocation", "bounded list absence is not revocation"],
+      "trace": [
+        {"file": "src/messaging-store.ts", "contains": "onAccessLost"},
+        {"file": "src/editor-worker.ts", "contains": "engine.on('room.revoked'"},
+        {"file": "autoload/wbx.vim", "contains": "elseif method ==# 'room.revoked'"}
+      ],
+      "failure": "List/history failure retains nonauthoritative text and explicit refresh; only exact revocation/deletion evidence invalidates. Late old-store results cannot republish.",
+      "positive": [{"file": "test/editor.test.ts", "contains": "owner transitions preserve loading events"}],
+      "recovery": [{"file": "test/spaces-cache-integration.test.ts", "contains": "REST failure retains a labeled non-actionable list until an explicit successful refresh"}],
+      "limits": ["C4 now drives exact SDK deletion/self-revocation through actual IPC, default engine, worker stdio and both native editors. Synthetic fixed-origin REST remains stale deliberately; this is not live service verification."], "checklist": ["C4"]
+    },
+    {
+      "id": "E-source-unread", "source": "src/editor-engine.ts",
+      "owner": "ReadSourceLifecycle current source/health/events; RetainedUnread historical observations; engine reconciles them with store activity",
+      "decision": "keep", "reason": "Source identity/freshness and retained evidence must not collapse into one session/cache flag.",
+      "fields": [
+        {"names": ["reads", "unread"], "lifetime": "Engine-lifetime owners. Source stop/failure/renewal retires leases and fresh rows, not historical flags. Explicit stop or changed profile clears retained unread; disk-backed authenticated start clears in-memory hints before verified restore."},
+        {"names": ["wantReadStatus", "wantNotificationPreview"], "lifetime": "Captured startup intent; preview requires read opt-in. stop resets, failed preserves configured intent for stale diagnosis, never retries automatically."}
+      ],
+      "methods": ["unreadRetention", "observeReadActivity", "roomReadStatus", "startReadStatus", "readRoomsObserved", "applyReadChanges", "markRead"],
+      "invalidation": ["Read source terminal failure/replacement invalidates reaction preparations and source leases", "refresh-unavailable retains same-source degradation but clears fresh membership", "confirmed message activity contradicts historical read flags", "receipt admission requires exact current newest endpoint and fresh per-room evidence"],
+      "trace": [
+        {"file": "src/read-status-worker.ts", "contains": "changes"},
+        {"file": "src/read-status.ts", "contains": "onChanges"},
+        {"file": "src/read-source-lifecycle.ts", "contains": "source.onHealth"},
+        {"file": "autoload/wbx/history_activation.vim", "contains": "rooms.read"}
+      ],
+      "failure": "Inspect sanitized readStatusNotice/source epoch/revision before unread overlay or receipt admission. Healthy empty snapshots do not freshen retained evidence; no read flag or receipt follows missing data.",
+      "positive": [{"file": "test/read-status-cache.test.ts", "contains": "ordinary RPC startup waits for initial source evidence, then history works through source failure and recovery"}],
+      "recovery": [{"file": "test/read-status-session.test.ts", "contains": "temporary periodic status failure becomes unknown and then recovers without replaying writes"}],
+      "limits": ["C4 adds a complete forked synthetic SDK/default-worker/native workflow with stale/unknown Health traces and explicit recovery. Real other-client/service timing remains L1, not inferred from synthetic success."], "checklist": ["C4", "L1"]
+    },
+    {
+      "id": "E-cache", "source": "src/editor-engine.ts",
+      "owner": "DiskCacheLifecycle owns verified binding/hints/expiry/write admission; engine decides when initial source loading gates the live list",
+      "decision": "keep", "reason": "Cache rows, current catalogue completeness and fresh SDK unread are distinct evidence.",
+      "fields": [
+        {"names": ["disk", "received"], "lifetime": "Verified account/profile display owners; spaces_cache enables both. Received names/text/reactions keep independent observation times; no saved message enters the live store. Stop/failed/grant loss retire owners; clear serializes behind admitted file writes."},
+        {"names": ["initialRoomsPending"], "lifetime": "Startup live+read-status display latch; roomsLoaded clears it only under existing disk policy; successful startup, failed and stop clear. It is not a second room-fetch reservation."}
+      ],
+      "methods": ["roomsLoaded", "clearCachedSpaces", "bindReceived"],
+      "invalidation": ["verified account/config binding", "grant loss, exact room revocation, explicit clear", "REST success/empty replaces browse-only hints; failure never proves absence"],
+      "trace": [
+        {"file": "src/disk-cache-lifecycle.ts", "contains": "roomsLoaded"},
+        {"file": "src/spaces-cache.ts", "contains": "spacesCacheKey"},
+        {"file": "autoload/wbx.vim", "contains": "function! wbx#cache_clear()"}
+      ],
+      "failure": "Inspect catalogue status separately from spacesCache and unreadStale. Explicit rooms refresh recovers browse-only list; corrupt files do not become empty live membership.",
+      "positive": [{"file": "test/spaces-cache-integration.test.ts", "contains": "verified-account cached rows arrive before REST/SDK"}],
+      "recovery": [{"file": "test/spaces-cache-integration.test.ts", "contains": "ordinary RPC disk restore, failed refresh, recovery and clear"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "E-storage", "source": "src/editor-engine.ts",
+      "owner": "VerifiedStorageIdentity, LocalDraftsLifecycle and SectionPreferencesLifecycle retain separate identity/I/O/revision authority",
+      "decision": "keep", "reason": "Shared verified key avoids duplicate identity probes; native text and storage physical settlement remain separate.",
+      "fields": [
+        {"names": ["identity"], "lifetime": "Configure after authenticated grant; failed-state predicate denies use; stop resets binding/pending reference. Identity reset does not release another consumer's physical I/O."},
+        {"names": ["drafts"], "lifetime": "Engine-lifetime owner; stop resets opened profile, not busy I/O. failed makes captured current predicate false. Conflict requires explicit reopen; no unverified account restoration."},
+        {"names": ["preferences"], "lifetime": "Engine-lifetime owner; failed/stop reset model/visibility but retain physical reservation and user-intent sequencing against late restore."}
+      ],
+      "methods": ["verifiedStorageKey", "openLocalDrafts", "saveLocalDrafts", "draftSession", "editSections", "sectionPreferences", "preferenceSession"],
+      "invalidation": ["captured generation/ready/key/profile/revision", "native edits supersede automatic restore", "grant loss is consumer-specific, not a global storage identity rewrite"],
+      "trace": [
+        {"file": "src/verified-storage-identity.ts", "contains": "class VerifiedStorageIdentity"},
+        {"file": "src/local-drafts-lifecycle.ts", "contains": "class LocalDraftsLifecycle"},
+        {"file": "autoload/wbx/draft_persistence.vim", "contains": "drafts.save"},
+        {"file": "autoload/wbx/sections.vim", "contains": "sections.preferences"}
+      ],
+      "failure": "Separate identity denial, disk safety error and content revision conflict. Retain native text/uncertainty; explicit reopen or clear/save is not send recovery.",
+      "positive": [{"file": "test/storage-identity-integration.test.ts", "contains": "ordinary RPC cache, drafts and preferences share one held identity"}],
+      "recovery": [
+        {"file": "test/local-drafts-lifecycle-integration.test.ts", "contains": "revision conflict and transient storage failure retain bytes until explicit reopen and save recovery"},
+        {"file": "test/section-preferences-integration.test.ts", "contains": "corrupt preference failure preserves user work"}
+      ],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "E-people-names", "source": "src/editor-engine.ts",
+      "owner": "PresenceLifecycle owns relevance/retained presence; SenderNames owns bounded identity-label cache and denial latch",
+      "decision": "keep", "reason": "Current credential getters do not grant permission to retry denial or perform reads from snapshot.",
+      "fields": [
+        {"names": ["presence", "wantPeopleStatus"], "lifetime": "Presence resets on start/stop, stops on failed; selected metadata/revocation prunes relevance. Background renewal replaces provider but retains shared physical People admission."},
+        {"names": ["names", "wantSenderNames", "senderScope"], "lifetime": "Names session resets on grant change, failed/stop; senderScope compares sorted actual grant. Token-only renewal retains cache/denial; startup intent controls history/preview identity exposure independently."}
+      ],
+      "methods": ["presenceContext", "startPeopleStatus", "startSenderNames", "observeSenderNames", "lookupPeople", "setPeopleViewport", "setPeopleSpaces"],
+      "invalidation": ["selected room/visible direct rows, opt-out, account/physical provider replacement", "grant loss/denial/TTL/Retry-After", "source privacy consent controls message sender IDs"],
+      "trace": [
+        {"file": "src/presence-lifecycle.ts", "contains": "class PresenceLifecycle"},
+        {"file": "src/sender-names.ts", "contains": "setSession"},
+        {"file": "autoload/wbx/people.vim", "contains": "people.viewport"}
+      ],
+      "failure": "Optional identity/presence failure cannot delay ready history or turn a display label into peer authority. Inspect feature health/backoff; explicit read or paced automatic refresh follows existing policy.",
+      "positive": [{"file": "test/people-integration.test.ts", "contains": "RPC A -> B -> A navigation returns fresh A"}],
+      "recovery": [{"file": "test/people-integration.test.ts", "contains": "RPC presence failure/backoff/recovery leaves ready history"}],
+      "limits": ["Real service/other-client return and original observed reaction delay attribution remain unverified."], "checklist": ["L1"]
+    },
+    {
+      "id": "E-agenda", "source": "src/editor-engine.ts",
+      "owner": "UpcomingAgenda owns discovery projection/timer/revision; engine supplies credentials and resolves explicit join target",
+      "decision": "keep", "reason": "Optional discovery remains independent of messaging startup and meeting/media ownership.",
+      "fields": [{"names": ["agenda", "wantUpcomingMeetings"], "lifetime": "Engine-lifetime owner; start/renew supplies session; failed/stop stop scheduling, stop resets intent. Provider retains physical admission; late old result is fenced."}],
+      "methods": ["startUpcoming", "refreshUpcoming", "upcomingJoinTarget"],
+      "invalidation": ["credential/session replacement, clock expiry, explicit refresh/revision drift", "stop/failed; not native redraw"],
+      "trace": [
+        {"file": "src/upcoming-agenda.ts", "contains": "joinTarget"},
+        {"file": "src/editor-worker.ts", "contains": "case 'meeting.joinUpcoming'"},
+        {"file": "autoload/wbx/meeting_action.vim", "contains": "meeting.joinUpcoming"}
+      ],
+      "failure": "Unavailable/expired agenda is not no meetings; explicit refresh and bounded revision-checked join only, no implicit join/rejoin.",
+      "positive": [{"file": "test/upcoming-meetings-integration.test.ts", "contains": "ordinary RPC space navigation completes while optional agenda is held"}],
+      "recovery": [{"file": "test/upcoming-meetings-integration.test.ts", "contains": "clock expiry removes cards; failure and late stopped-session success"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "E-attachments", "source": "src/editor-engine.ts",
+      "owner": "Engine binds one logical attachment pipeline; ContentAdmission and AttachmentTransfer own physical read admission and transfer credit/bytes",
+      "decision": "keep", "reason": "C3 directly proves logical operation/pipeline retirement, physical content/cleanup admission and a fresh transfer's independent lifetime. No further extraction or duplicated reservation owner is justified.",
+      "fields": [
+        {"names": ["contentAdmission"], "lifetime": "Engine-lifetime shared physical preview/typed admission; session reset does not authorize overlapping unsettled native work."},
+        {"names": ["attachmentOperations"], "lifetime": "RPC-number map of captured store/generation/abort. Matching finally/release removes; stop aborts and clears logical map. Physical workers retain their own reservations."},
+        {"names": ["attachmentPipeline", "attachmentTransfer"], "lifetime": "Pipeline token spans resolve through descriptor completion/close; transfer callbacks clear only matching token. publish revalidates. failed-state invalidity closes published transfers but failed does not explicitly abort the whole operation map."}
+      ],
+      "methods": ["attachmentMetadata", "images", "openImage", "openAttachment", "checkAttachmentPipeline", "resolveAttachment", "transferOwner", "attachmentChunk", "completeAttachment", "attachmentSent", "rejectAttachmentTransfer", "cancelAttachment"],
+      "invalidation": ["exact destination signal on selection/reload/removal", "grant loss aborts matching work", "session/state/store predicate and transfer revalidation", "cancel/descriptor deadline/output failure/stop"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "this.engine.attachmentSent"},
+        {"file": "src/attachment-transfer.ts", "contains": "revalidate"},
+        {"file": "src/content-admission.ts", "contains": "class ContentAdmission"},
+        {"file": "autoload/wbx/attachment_open.vim", "contains": "messages.attachmentResolve"}
+      ],
+      "failure": "Distinguish logical cancel, original HTTP/converter settlement, descriptor publication and output callback/drain. Retrying a GET or releasing physical admission on abort is not recovery.",
+      "positive": [{"file": "test/attachment-transfer.test.ts", "contains": "one selected representation is pulled once, hashed, completed"}],
+      "recovery": [
+        {"file": "test/attachment-resolve.test.ts", "contains": "timeout and account/API replacement retain worker-native admission"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "late sibling cleanup cannot clear a fresh transfer or publish old bytes"}
+      ],
+      "limits": ["C3 covers real content/API/admission/transfer owners with a controlled fetch/body-cancel boundary alongside held storage and writes. Converter internals and SDK-to-native source recovery retain separate existing/C4 coverage."], "checklist": ["C3"]
+    },
+    {
+      "id": "E-send-upload", "source": "src/editor-engine.ts",
+      "owner": "MessagingStore new-message ledger; Uploads physical snapshot/send reservation; engine routes plain/rich/file admission and outcomes",
+      "decision": "keep", "reason": "C3 proves the common upload ledger, physical send/anonymous FD and logical display transaction remain separate during mixed failure/stop/replacement. No additional forwarding extraction is required to close this interaction.",
+      "fields": [
+        {"names": ["uploads"], "lifetime": "Engine-lifetime physical owner; reset revokes logical references on failed/stop/grant loss, not an unsettled physical send; room revoke is exact."},
+        {"names": ["uploadTransaction"], "lifetime": "Per-send token with generation for uploadPending projection; matching finally clears; failed/stop clear display authority. Not physical-release proof."}
+      ],
+      "methods": ["send", "sendRich", "uploadWriteAllowed", "uploadContext", "recipientUploadContext", "stageUpload", "removeUpload", "cancelUpload", "sendUpload", "resolveDelivery", "resolveBoundDelivery"],
+      "invalidation": ["exact room/reply/draft/file/format/consent admission", "current grant before dispatch/after reads", "post-submission ambiguity retains unknown", "session/room replacement and logical abort never replay mutation"],
+      "trace": [
+        {"file": "autoload/wbx/send_action.vim", "contains": "messages.send"},
+        {"file": "src/uploads.ts", "contains": "class Uploads"},
+        {"file": "src/messaging-store.ts", "contains": "sendPrepared"},
+        {"file": "autoload/wbx/delivery_ingress.vim", "contains": "wbx#drafts#delivery"},
+        {"file": "autoload/wbx/delivery_recovery.vim", "contains": "delivery.resolveBound"}
+      ],
+      "failure": "Track exact request and submitted boundary. HTTP/RPC acceptance is not valid ACK/delivery; separate definitely-not-sent, failed, unknown and local-clear refusal. Bound recovery never resends.",
+      "positive": [{"file": "test/uploads-integration.test.ts", "contains": "actual engine stages/uploads through the common new-message ledger"}],
+      "recovery": [
+        {"file": "test/editor/delivery-ingress-workflows.vim", "contains": "Explicit send after bound resolution"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "old anonymous snapshot closes only after the held native write drains"}
+      ],
+      "limits": ["C3's file-backed upload variant retains the actual snapshot FD through a held ACK/ClientRequest close, keeps original uncertainty inert, then completes a fresh explicit staged upload alongside held storage/content. Existing rich/mention and native-clear contracts are not replaced by this matrix."], "checklist": ["C3"]
+    },
+    {
+      "id": "E-feature-reads", "source": "src/editor-engine.ts",
+      "owner": "Engine current session/selected-target/grant/one physical action gate; DirectorySearch/MessageQueries/RoomMembers/ServerTeams own bounded results",
+      "decision": "keep", "reason": "Finite adapters share existing admission without a generic provider/RPC tunnel or duplicate registry.",
+      "fields": [
+        {"names": ["featureAbort"], "lifetime": "One explicit feature/rich action logical abort token. finally clears only same token; failed/stop abort but do not clear before physical shared REST settles."},
+        {"names": ["members"], "lifetime": "Engine-lifetime selected-room roster owner; store onChange selects exact current room; failed/stop clear selected roster."},
+        {"names": ["directory", "messageQueries", "teams"], "lifetime": "Engine-lifetime bounded result owners; explicit new query supersedes its slot. stop resets all; select resets message queries; revoke resets selected queries. failed leaves query objects inert behind session predicates; Team rename invalidates Team selection/labels only."}
+      ],
+      "methods": ["sessionOwner", "featureOwner", "featureGrant", "feature", "queryThread", "queryMentions", "personProfile", "searchDirectory", "joinedTeams", "serverTeams", "memberVisibility", "roomMembers"],
+      "invalidation": ["generation/store/state, selected conversation/message owner and query revision/age", "current grants and logical deadline", "physical PublicREST busy gate survives canceled logical work"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "case 'messages.thread'"},
+        {"file": "src/message-queries.ts", "contains": "class MessageQueries"},
+        {"file": "autoload/wbx/queries.vim", "contains": "messages.thread"}
+      ],
+      "failure": "Error is not empty/complete query, peer identity, role or membership proof. Retain inert text; explicit fresh read is separate from mutation recovery.",
+      "positive": [{"file": "test/demo-rest-integration.test.ts", "contains": "ordinary demo RPC directory/profile/roster/team/query reads"}],
+      "recovery": [{"file": "test/demo-rest-integration.test.ts", "contains": "ordinary demo RPC read failure leaves history usable and recovers only on an explicit read"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "E-message-actions", "source": "src/editor-engine.ts",
+      "owner": "MessageActions/MessageReactions own preparations, exact-request outcomes and retained uncertainty; engine binds loaded target/source/grant",
+      "decision": "keep", "reason": "Read-source lease, loaded target and mutation physical settlement are distinct authorities, not duplicate epochs.",
+      "fields": [
+        {"names": ["actions"], "lifetime": "Engine-lifetime owner; failed/stop reset contexts, request results, uncertainty and edit counts. Logical cancel retains its OperationSlot until physical settlement. Native message_actions retains its own unknown-target evidence; this is NOT retained backend ledger state."},
+        {"names": ["reactions"], "lifetime": "Engine-lifetime owner; read-source invalidation/failed/stop reset preparations while retaining exact-request uncertain reaction outcomes and unsettled physical admission. This intentionally differs from MessageActions and ConversationActions reset."},
+        {"names": ["demoReactions"], "lifetime": "Engine-lifetime synthetic sandbox groups; does not authorize live writes or become a second live source."}
+      ],
+      "methods": ["reactionProvider", "reactionReadOwner", "reactionOwner", "reactionBatchProvider", "reactionSummaries", "messageReaders", "reactionSummary", "reactionDetails", "cacheReaction", "inspectReactions", "prepareReaction", "submitReaction", "discardReaction", "prepareMessageAction", "mutateMessage", "resolveMutation", "discardMessageContext"],
+      "invalidation": ["exact current selected message and source lease", "grant loss, preparation expiry, reset/failed/stop", "reaction unknown ledger survives resets; reaction inspection uses original request, not cached summary; message-action backend ledger clears on reset"],
+      "trace": [
+        {"file": "src/read-source-lifecycle.ts", "contains": "lease()"},
+        {"file": "src/message-reactions.ts", "contains": "class MessageReactions"},
+        {"file": "autoload/wbx/reactions.vim", "contains": "messages.reactionSubmit"},
+        {"file": "autoload/wbx/reaction_history.vim", "contains": "diagnostics"}
+      ],
+      "failure": "Reaction read categories remain sanitized and observable through Health; zero is not inferred from failure. Exact submitted reaction-request inspection is distinct from legacy message-target resolution; a passive summary resolves neither.",
+      "positive": [{"file": "test/demo-reactions-integration.test.ts", "contains": "ordinary demo reaction RPC summary/batch inspect add replay and own remove"}],
+      "recovery": [{"file": "test/read-status-cache.test.ts", "contains": "reaction uncertainty survives source degradation/reset and requires exact-request inspection"}],
+      "limits": ["Live other-client return and original operator-observed delay are not established by synthetic fixtures."], "checklist": ["L1"]
+    },
+    {
+      "id": "E-conversations", "source": "src/editor-engine.ts",
+      "owner": "ConversationActions owns recipient/space/Team mutations and shared retained request ledger; engine validates selected/joined targets and publishes only permitted effects",
+      "decision": "keep", "reason": "Finite adapters preserve action-specific proof and original-request recovery; combining their authorities would weaken them.",
+      "fields": [
+        {"names": ["conversations"], "lifetime": "Engine-lifetime owner; failed/stop clear active requests/uncertainty/recipients/sent IDs, moving only partition-proven metadata possible-writes to the disjoint retired section of the same bounded ledger. Fresh authenticated self plus exact config/OAuth-profile partition is required to recover original request. No retired outcome replay or role/target publication; OperationSlot still holds physical admission until settlement."},
+        {"names": ["directPending", "directTransaction"], "lifetime": "One display flag with identity token; matching finally releases it; failed/stop retire display authority, not physical direct POST. direct.delivery precedes accepted room/message publication."}
+      ],
+      "methods": ["conversationAdmission", "prepareDirect", "sendDirect", "resolveDirect", "discardDirect", "createSpace", "renameSpace", "spaceMetadataAdmission", "prepareSpaceDescription", "describeSpace", "clearSpaceDescription", "setSpaceLocked", "setSpaceAnnouncementOnly", "membershipAction", "resolveConversationAction", "recoverConversationAction", "prepareTeamDescription", "describeTeam", "prepareTeamRename", "renameTeam"],
+      "invalidation": ["session/target/current grant/preimage and explicit consent", "role/membership/Team proof repeats at action boundary", "leave unknown revokes exact room; metadata ACKs do not grant ongoing role/read/cache authority", "only original action/target/request recovery may clear uncertain ledger"],
+      "trace": [
+        {"file": "src/conversation-actions.ts", "contains": "class ConversationActions"},
+        {"file": "src/editor-worker.ts", "contains": "case 'conversations.resolve'"},
+        {"file": "autoload/wbx/conversations.vim", "contains": "conversations.resolve"}
+      ],
+      "failure": "Validate raw ACK before publication; named-only action recovery is not generic reset/retry. Team proof is not Room proof. Wnr remains Remove Member.",
+      "positive": [{"file": "test/demo-rest-integration.test.ts", "contains": "ordinary demo RPC create/select/rename/description and invite/remove"}],
+      "recovery": [
+        {"file": "test/conversation-reset-recovery.test.ts", "contains": "reset retains only checked original-request recovery, then new deliberate work succeeds"},
+        {"file": "test/space-rename-transport.test.ts", "contains": "C2 physical engine/RPC reset recovery"},
+        {"file": "test/editor/conversation-reset-recovery.vim", "contains": "same-partition space reset/reconnect resolves original request without replay"}
+      ],
+      "limits": ["Recovery is process-local across application-session reset/reconnect, not durable storage or automatic recovery after worker-process loss. Active and retired request sections are disjoint, share one limit, and late old completions cannot populate either. Legacy nonmetadata reset contracts remain unchanged."], "checklist": ["C2"]
+    },
+    {
+      "id": "E-meeting-auth", "source": "src/editor-engine.ts",
+      "owner": "Engine lends current messaging authorization; EditorMeetings/media owner remains independent",
+      "decision": "keep", "reason": "Socket-only handoff avoids a second interactive login or token exposure through editor protocol.",
+      "fields": [],
+      "methods": ["meetingAuthorization"],
+      "invalidation": ["in-progress login, wrong config/grant, generation/OAuth identity replacement", "failed handoff fails current application only when still same OAuth owner"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "meetings.authorization = path => engine.meetingAuthorization(path)"},
+        {"file": "src/editor-meetings.ts", "contains": "authorization"},
+        {"file": "src/oauth.ts", "contains": "handoff"}
+      ],
+      "failure": "No new browser/sign-in fallback on restricted grant or competing login. Messaging stop does not by itself prove independent meeting media ended.",
+      "positive": [{"file": "test/meeting-auth.test.ts", "contains": "connected messaging lends its login to a detached meeting"}],
+      "recovery": [{"file": "test/meeting-auth.test.ts", "contains": "shares renewal both ways"}],
+      "limits": ["Actual device/transmission/graphical acceptance remains separate."], "checklist": ["L2"]
+    },
+    {
+      "id": "N-state", "source": "autoload/wbx.vim",
+      "owner": "Native application admits validated snapshots and applies cross-domain invalidations before render/events",
+      "decision": "keep", "reason": "This is the application consistency boundary; a generic reset-all policy would conflate messaging, meeting and retained evidence.",
+      "fields": [
+        {"names": ["s:state"], "lifetime": "One accepted backend projection; s:apply requires increasing revision. connection_prepare clears selected data/revision; _exit overlays idle/unready/loading/sending false without erasing native drafts. Does not become authoritative backend storage."},
+        {"names": ["s:context_epoch"], "lifetime": "Native intent fence increments on state/room/readiness changes and exact room.revoked. Session ID is checked separately; not all redraws increment it."},
+        {"names": ["s:room_counts"], "lifetime": "Only unread_stale/cached scalar display counts; rebuilt in accepted-state loop and cleared on prepare. Never admit receipts or remote absence."}
+      ],
+      "methods": ["s:apply", "wbx#state", "wbx#context_epoch"],
+      "invalidation": ["state/session transition stops attachment/image/render work and resets session-scoped feature assertions", "delivery ingress retires old pending sends into uncertainty", "idle/failed invalidates staged/direct/action state; state/room/readiness fences local intents", "accepted snapshot then persistence/unread/paging/image/activation/render/notification/User event ordering"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "this.notify('state'"},
+        {"file": "autoload/wbx/protocol.vim", "contains": "function! wbx#protocol#valid"},
+        {"file": "autoload/wbx/delivery_ingress.vim", "contains": "observe(previous, next)"}
+      ],
+      "failure": "Inspect rejected revision, existing localContext session and context epoch separately. Ready-to-ready replacement is not failure/idle; delegated guards must reject old actions without losing retained drafts.",
+      "positive": [{"file": "test/editor/connection-workflows.vim", "contains": "ready-failed-ready-idle-ready: meeting actions succeed without transport restart"}],
+      "recovery": [{"file": "test/editor/delivery-ingress-workflows.vim", "contains": "Submission retained across ready-session replacement"}],
+      "limits": ["No single new broad invalidation framework or reset counter is justified by the inventory."], "checklist": ["C4"]
+    },
+    {
+      "id": "N-transport", "source": "autoload/wbx.vim",
+      "owner": "Native connection/RPC channel and transport own handshake/correlation/physical jobs; application dispatches domain events and exit cleanup",
+      "decision": "keep", "reason": "One domain ingress plus explicit exit ordering is necessary; feature owners retain their own evidence.",
+      "fields": [{"names": ["s:connection"], "lifetime": "Script-lifetime composed connection owner. Transport loss resets assertions/pending callbacks but keeps monotonic request identity; session changes do not revoke independent meeting assertions."}],
+      "methods": ["s:connection_backend", "s:connection_prepare", "s:hello", "s:connection_accept", "wbx#rpc", "wbx#_receive", "wbx#_protocol_error", "wbx#_exit"],
+      "invalidation": ["protocol failure stops physical backend and invokes exit cleanup", "exit retires render/requests/selection/attachments, marks meeting controls unready while retaining media unknown", "room.revoked invalidates exact draft/upload/notification evidence without guessing other-room absence"],
+      "trace": [
+        {"file": "autoload/wbx/transport.vim", "contains": "wbx#_receive"},
+        {"file": "autoload/wbx/connection.vim", "contains": "function! wbx#connection#lost"},
+        {"file": "autoload/wbx/rpc_channel.vim", "contains": "function! wbx#rpc_channel#reset"}
+      ],
+      "failure": "Use Health for physical running versus negotiated readiness. Broken protocol is not interpreted as editor commands; no automatic reconnect or mutation replay.",
+      "positive": [{"file": "test/editor/rpc-workflows.vim", "contains": "cold passive refusal, held hello, single startup and FIFO drain"}],
+      "recovery": [{"file": "test/editor/connection-workflows.vim", "contains": "explicit reconnect only: old hello/work cannot restore assertions or replay"}],
+      "limits": ["C4 proves source failure, explicit refresh, exact invalidation and subsequent native work through real stdio in both editors, headless/drawn. Native Health/request logs are whitelisted; external service/device/operator acceptance remains separate."], "checklist": ["C4"]
+    },
+    {
+      "id": "N-workspace", "source": "autoload/wbx.vim",
+      "owner": "Workspace/view/buffer_setup own handles, exact native writes, promotion, native mappings and geometry",
+      "decision": "keep", "reason": "Adapters do not introduce a second window, text or mapping registry.",
+      "fields": [
+        {"names": ["s:root", "s:save_cpo"], "lifetime": "Root is immutable script resource path; save_cpo is load-time compatibility scratch restored/unlet at end, not runtime feature state."},
+        {"names": ["s:workspace", "s:buffer_setup_effects"], "lifetime": "Script-lifetime owner/effect table. Workspace tracks exact handles/renames; native promotion/collision rules retire ownership without deleting user work."}
+      ],
+      "methods": ["s:options", "s:compose_name", "s:owned_buffer", "s:edited_view", "s:buffer", "wbx#_rename_pre", "wbx#_rename_post", "s:write", "s:local_setup", "wbx#_window_leave", "wbx#_window_enter", "s:workspace_geometry", "s:workspace_statusline", "s:workspace_draft", "s:layout", "wbx#layout_reset", "wbx#open", "wbx#_setup_buffer", "wbx#_draft_setup", "wbx#buffers"],
+      "invalidation": ["exact name/type/kind and window ownership changes", "native edits pause generated writes; explicit refresh! only discards owned generated edits", "default mappings install/release only if still plugin-owned; Wnr remains Remove Member"],
+      "trace": [
+        {"file": "plugin/wbx.vim", "contains": "Webex"},
+        {"file": "autoload/wbx/workspace.vim", "contains": "function! wbx#workspace#buffer"},
+        {"file": "autoload/wbx/view.vim", "contains": "function! wbx#view#write"},
+        {"file": "autoload/wbx/buffer_setup.vim", "contains": "wbx_default_maps"}
+      ],
+      "failure": "Name collision/annotation is retained work, not a missing render to overwrite. Inspect exact ownership, notice and native text/undo before explicit repair.",
+      "positive": [{"file": "test/editor/workspace-workflows.vim", "contains": "public open/Enter/compose/reopen works without disturbing foreign work"}],
+      "recovery": [{"file": "test/editor/setup-workflows.vim", "contains": "failure/recovery and ordinary reopen/re-entry preserve draft text"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "N-selection", "source": "autoload/wbx.vim",
+      "owner": "Selection/space_picker own intent and request focus; history_activation owns endpoint/receipt attempts",
+      "decision": "keep", "reason": "Picker serial, asynchronous focus request and receipt endpoint are different lifetimes, not three competing sessions.",
+      "fields": [{"names": ["s:selection", "s:space_picker", "s:activation"], "lifetime": "Script-lifetime owner handles. Navigation cancels focus, not callbacks/physical requests; picker consumes matching context; transport loss retires pending activation; endpoint evidence remains bounded in activation owner."}],
+      "methods": ["wbx#select_current", "wbx#_cancel_selection_focus", "s:selection_open", "s:activation_state", "wbx#select", "s:selection_context", "s:selection_attachments", "s:selection_request", "wbx#room_unread_context", "wbx#rooms", "wbx#local_action_reason", "wbx#latest", "wbx#mark_read", "wbx#cache_clear", "wbx#picker_context", "wbx#pick_select", "wbx#picker_cancel", "wbx#pick"],
+      "invalidation": ["native origin/window/name/tick/session/context checks", "captured selection session must match at ACK before activation", "same-space ready return is local; picker explicitly disables receipts", "receipt needs current fresh endpoint, complete visible native history and deliberate admission"],
+      "trace": [
+        {"file": "lua/wbx-tui/init.lua", "contains": "pick_select"},
+        {"file": "autoload/wbx/selection.vim", "contains": "request.session"},
+        {"file": "src/editor-worker.ts", "contains": "case 'rooms.select'"},
+        {"file": "src/editor-engine.ts", "contains": "async markRead"}
+      ],
+      "failure": "Distinguish stale choice, selection failure, stale ACK and annotated history. New deliberate choice/reload recovers; neither picker nor incomplete history grants a read receipt.",
+      "positive": [{"file": "test/editor/space-picker-workflows.vim", "contains": "ordinary public native picker opens exact"}],
+      "recovery": [{"file": "test/editor/space-picker-workflows.vim", "contains": "failed selection keeps origin"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "N-composer-delivery", "source": "autoload/wbx.vim",
+      "owner": "Drafts/native buffers own text/pending/uncertainty; send/ingress/clear/recovery owners compose exact effects",
+      "decision": "keep", "reason": "No pending, uncertainty or native text is duplicated in coordinator fields.",
+      "fields": [{"names": ["s:send_action", "s:delivery_clear", "s:delivery_ingress", "s:delivery_recovery"], "lifetime": "Script-lifetime ports-only handles. Draft pending/uncertainty is destination-bound and survives lost possible writes; local clear retries have no remote send authority."}],
+      "methods": ["s:compose_buffer", "s:delivery_uncertain", "s:delivery_pending", "wbx#compose", "wbx#reply", "wbx#cancel_reply", "wbx#send", "s:send_state", "s:delivery_clear_state", "wbx#resolve_delivery", "s:delivery_recovery_state"],
+      "invalidation": ["exact target/parent/text/tick/format/file/session before clear", "session/transport loss retires request authority but preserves possible-write uncertainty", "old/duplicate results cannot clear newer work", "only exact bound acknowledged recovery clears matching evidence"],
+      "trace": [
+        {"file": "autoload/wbx/send_action.vim", "contains": "wbx#drafts#register"},
+        {"file": "src/editor-worker.ts", "contains": "case 'messages.send'"},
+        {"file": "autoload/wbx/delivery_clear.vim", "contains": "wbx_confirmed_sent"}
+      ],
+      "failure": "Follow explicit send -> pending register -> dispatch -> delivery, not just RPC response. Distinguish unknown remote outcome from confirmed-sent-but-local-write-refused; neither should resend automatically.",
+      "positive": [{"file": "test/editor/delivery-ingress-workflows.vim", "contains": "ordinary Enter/write never send"}],
+      "recovery": [{"file": "test/editor/delivery-ingress-workflows.vim", "contains": "Explicit send after bound resolution"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "N-render", "source": "autoload/wbx.vim",
+      "owner": "Render assembles rooms/history; render_request owns E565-only coalesced retry; view owns native writes",
+      "decision": "keep", "reason": "Presentation retry is separate from mutation/ACK replay; no new render cache in the coordinator.",
+      "fields": [{"names": ["s:renderer", "s:render_request"], "lifetime": "Script-lifetime owner handles; signatures and one bounded presentation timer live in extracted owners. Accepted state/session changes, prepare/exit/disconnect/shutdown cancel stale render work."}],
+      "methods": ["s:connection_hint", "s:render_compose", "s:render", "s:render_context", "s:render_now", "wbx#redraw", "wbx#redraw_status", "wbx#refresh"],
+      "invalidation": ["current session/state/disconnection render context", "native annotations/promotion/collision", "E565 alone schedules current-state presentation, never stores or replays ACK/delivery"],
+      "trace": [
+        {"file": "autoload/wbx/render_request.vim", "contains": "E565"},
+        {"file": "autoload/wbx/render.vim", "contains": "wbx#history#syntax"},
+        {"file": "syntax/wbx-history.vim", "contains": "WbxMessageTime"}
+      ],
+      "failure": "Inspect accepted state, render request interruption, exact ownership and syntax separately. A timestamp-highlight defect is not backend/session failure.",
+      "positive": [{"file": "test/editor/render-workflows.vim", "contains": "public Enter navigation returns promptly to correct history"}],
+      "recovery": [{"file": "test/editor/delivery-render-workflows.vim", "contains": "completeTextlockACKObserved"}],
+      "limits": ["C1 is closed: original UI and metadata/Markdown fixtures pass headless/drawn in both editors; timestamp paint has direct screen-attribute assertions. Historical excluded/failing runs remain evidence, not current acceptance."], "checklist": ["C1"]
+    },
+    {
+      "id": "N-attachments", "source": "autoload/wbx.vim",
+      "owner": "Attachment_open/image_request bind native intent; typed/chunk/file/image owners retain physical jobs, bytes and sinks",
+      "decision": "keep", "reason": "Coordinator only supplies narrow ports and compatibility callbacks, not another operation registry.",
+      "fields": [{"names": ["s:attachment_open", "s:image_request"], "lifetime": "Script-lifetime logical owners. Accepted session/state changes and exit/disconnect/shutdown stop/reset; selection/native intent changes revoke matching handoff. Physical cleanup remains separate."}],
+      "methods": ["wbx#_images_visible", "s:message_at_cursor", "wbx#image_open", "wbx#attachment_context", "wbx#attachment_valid", "wbx#attachment_handoff", "wbx#_attachment_check", "wbx#_attachment_stream_ready", "wbx#_attachment_stream_failed", "wbx#_attachment_stream_result", "wbx#attachment_image", "wbx#attachment_open", "s:attachment_state", "s:attachment_can_cancel", "s:attachment_image_busy", "s:attachment_set_image_busy"],
+      "invalidation": ["CursorMoved/TextChanged/BufLeave/WinLeave context guard", "exact session/room/message/file/history source/generation", "late old callback cannot release current image reservation"],
+      "trace": [
+        {"file": "autoload/wbx/attachment_open.vim", "contains": "messages.attachmentCancel"},
+        {"file": "src/editor-worker.ts", "contains": "messages.attachmentResolve"},
+        {"file": "autoload/wbx/attachment_stream.vim", "contains": "function!"}
+      ],
+      "failure": "Separate invalidated intent from physical sink/handler failure. Retry is a new explicit action; canceled bytes cannot become a new target or arbitrary command.",
+      "positive": [{"file": "test/editor/attachment-open-workflows.vim", "contains": "ordinary inline and chunked original reads materialize exact native text"}],
+      "recovery": [{"file": "test/editor/image-request-workflows.vim", "contains": "wrong image identity follows protocol disconnect without opening; explicit reconnect/new open recovers"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "N-meeting", "source": "autoload/wbx.vim",
+      "owner": "Meeting_action independent observations/actions; meeting_status pure text; transport/media owners physical client/process truth",
+      "decision": "keep", "reason": "Messaging session is deliberately not the independent meeting lifetime.",
+      "fields": [{"names": ["s:meeting_action"], "lifetime": "Script-lifetime independent meeting/event/pane-request owner. Owner/active changes clear events; transport loss retires request and marks unready, retaining unknown media. Local detach never implies leave."}],
+      "methods": ["wbx#upcoming", "wbx#meeting", "wbx#present", "wbx#detach", "wbx#_meeting_view_closed", "wbx#_meeting_view_opened", "wbx#meeting_status", "wbx#control", "wbx#meeting_supports", "wbx#meeting_events", "wbx#meeting_epoch", "wbx#_meeting_pending", "wbx#_meeting_reset", "wbx#_meeting_pane", "wbx#_meeting_reconnect", "wbx#_meeting_auth", "s:meeting_closing", "s:render_meeting", "wbx#meeting_state"],
+      "invalidation": ["same original owner/session for explicit reconnect/pane ACK", "transport loss means controls unavailable/media unknown", "explicit leave uses real original-process exit, independent auxiliary cleanup and editor detach"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "case 'meeting.reconnect'"},
+        {"file": "src/editor-meetings.ts", "contains": "processEnded"},
+        {"file": "src/call-panes.ts", "contains": "private async closeView"},
+        {"file": "autoload/wbx/meeting_status.vim", "contains": "Last reported "}
+      ],
+      "failure": "Distinguish stale report, unready owner, client view loss and confirmed media-process exit. Status rendering never rejoins or replays controls.",
+      "positive": [{"file": "test/editor/meeting-status-workflows.vim", "contains": "normal public status updates synchronously"}],
+      "recovery": [{"file": "test/editor/meeting-action-workflows.vim", "contains": "transport loss retains last owner"}],
+      "limits": ["Six tmux/demo lifecycle cases are offline process evidence, not graphical/device/live-media acceptance."], "checklist": ["L2"]
+    },
+    {
+      "id": "N-paging", "source": "autoload/wbx.vim",
+      "owner": "Paging owns per-surface navigation/request intent; application routes one explicit bounded list/history request",
+      "decision": "keep", "reason": "Automatic navigation is a read policy, not send/receipt consent or another session owner.",
+      "fields": [],
+      "methods": ["s:paged", "wbx#page", "wbx#_navigation", "wbx#_scrolled"],
+      "invalidation": ["accepted state/selection/readiness updates", "native edited/promoted surface, wrong window or stale token", "transport prepare/exit reset navigation baseline"],
+      "trace": [
+        {"file": "autoload/wbx/paging.vim", "contains": "function! wbx#paging#finish"},
+        {"file": "src/editor-worker.ts", "contains": "case 'messages.list'"},
+        {"file": "src/messaging-store.ts", "contains": "async refresh"}
+      ],
+      "failure": "A failed page is not end-of-list/history absence; finish clears matching token only and a new explicit navigation recovers.",
+      "positive": [{"file": "test/editor/navigation-plan.vim", "contains": "new room has independent paging admission after a stale completion"}],
+      "recovery": [{"file": "test/editor/navigation-plan.vim", "contains": "manual retries share one-inflight admission"}],
+      "limits": ["Assertions are surface/navigation coverage, not production network latency measurements."], "checklist": []
+    },
+    {
+      "id": "N-selectors", "source": "autoload/wbx.vim",
+      "owner": "Native application exposes detached/narrow capability, destination and health selectors; backend remains grant/physical authority",
+      "decision": "keep", "reason": "Stable public feature adapters are not duplicate negotiation registries; no need to split by line count.",
+      "fields": [],
+      "methods": ["wbx#supports", "wbx#supports_reactions", "wbx#supports_upload", "wbx#supports_direct", "wbx#supports_space", "wbx#supports_description", "wbx#supports_lock", "wbx#supports_announcement", "wbx#supports_description_clear", "wbx#supports_member_visibility", "wbx#supports_team", "wbx#supports_team_description", "wbx#supports_people_spaces", "wbx#supports_local_drafts", "wbx#supports_people_viewport", "wbx#status", "wbx#destination", "wbx#buffer_status", "wbx#show_destination", "wbx#statusline", "wbx#reaction_context", "wbx#read_by_context", "wbx#cached_reactions", "wbx#people_viewport_context"],
+      "invalidation": ["live connection assertion plus current application readiness/session where required", "source epoch/revision/degradation and exact destination remain independent", "status redraw must not scan message bodies or schedule service work"],
+      "trace": [
+        {"file": "autoload/wbx/connection.vim", "contains": "function! wbx#connection#feature"},
+        {"file": "src/editor-features.ts", "contains": "editorFeatures"},
+        {"file": "autoload/wbx/reaction_history.vim", "contains": "wbx#reaction_context"}
+      ],
+      "failure": "Capability means supported protocol, not grant/current membership or permission. Display selectors must never confer control or trigger reads.",
+      "positive": [{"file": "test/editor/status-performance.vim", "contains": "each admitted full state reaches its public hook"}],
+      "recovery": [{"file": "test/editor/reaction-return.vim", "contains": "same-source return is a local restore, not a 30-second recovery"}],
+      "limits": ["Assistive usefulness requires operator observation beyond text assertions."], "checklist": ["L3"]
+    },
+    {
+      "id": "N-diagnostics", "source": "autoload/wbx.vim",
+      "owner": "Native application publishes bounded local notices/User events and observational Health",
+      "decision": "keep", "reason": "Existing event API remains a compatibility surface, not a new log/session registry.",
+      "fields": [
+        {"names": ["s:last_error"], "lifetime": "Most recent sanitized 300-character local notice, also suppresses repeated collision notices; diagnostic only, not an error/outcome ledger."},
+        {"names": ["g:wbx_tui_event"], "lifetime": "Existing last User-event payload global replaced per event; handlers receive detached state/outcomes where contract requires it. Not callback correlation or durable history."}
+      ],
+      "methods": ["s:notify", "s:event", "wbx#health"],
+      "invalidation": ["new notice/event overwrites prior diagnostic value", "Health observes physical/negotiated/feature state without reset or service lookup"],
+      "trace": [
+        {"file": "autoload/wbx/connection.vim", "contains": "Notify"},
+        {"file": "autoload/wbx/delivery_ingress.vim", "contains": "'WbxDelivery'"},
+        {"file": "docs/editor.md", "contains": "WebexHealth"}
+      ],
+      "failure": "Health separates backend running, protocol readiness, read/source status, cache hints and mapping conflicts; provider/private data is not copied into messages.",
+      "positive": [{"file": "test/editor/reaction-quiet.vim", "contains": "a finite sanitized passive diagnostic stays inspectable in :WebexHealth"}],
+      "recovery": [{"file": "test/editor/connection-workflows.vim", "contains": "invalid hello does not drain; explicit valid handshake restores independent meeting"}],
+      "limits": ["Cross-layer failure walkthrough must name observable diagnostics as well as guards."], "checklist": ["C4"]
+    },
+    {
+      "id": "N-shutdown", "source": "autoload/wbx.vim",
+      "owner": "Native application cleanup ordering; backend shutdown barrier and physical transport own final settlement",
+      "decision": "keep", "reason": "Explicit messaging stop, editor exit and optional media leave cannot share a destructive reset-all action.",
+      "fields": [{"names": ["s:closing"], "lifetime": "Local editor-shutdown suppression flag; reset on connection_prepare, set before detach/shutdown request. Not meeting-ended or process-exit proof."}],
+      "methods": ["wbx#disconnect", "wbx#shutdown"],
+      "invalidation": ["flush local drafts, retire view/action work, retain possible-write uncertainty", "session.stop leaves independent meeting alone", "shutdown optionally requests explicit media leave; bounded wait then physical editor connection stop"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "this.shutdownId = request.id"},
+        {"file": "autoload/wbx/transport.vim", "contains": "function! wbx#transport#stop"},
+        {"file": "src/editor-meetings.ts", "contains": "async leave"}
+      ],
+      "failure": "No original-process termination claim until confirmed by media owner. Late client cleanup cannot kill foreign work or unblock an unsettled mutation.",
+      "positive": [{"file": "test/editor/meeting.test.ts", "contains": "unrelated session retained"}],
+      "recovery": [{"file": "test/editor/meeting-action-workflows.vim", "contains": "explicit rehandshake"}],
+      "limits": [], "checklist": []
+    },
+    {
+      "id": "W-routing", "source": "src/editor-worker.ts",
+      "owner": "EditorRPC finite wire validation/routing/replay; engine/meeting owners retain domain state",
+      "decision": "keep", "reason": "Explicit dispatch switch is not a provider framework or second feature store.",
+      "fields": [
+        {"names": ["engine", "meetings", "write"], "lifetime": "Worker-lifetime injected domain/output owners; write owns physical stdout bounds/drain, never credentials."},
+        {"names": ["hello", "highWater"], "lifetime": "Per-worker handshake and monotonic request admission; only valid hello enables notifications. No ID reuse across session stop/start."},
+        {"names": ["readerEvents"], "lifetime": "Per-worker explicit messages.readBy watch:true opt-in; gates room-only reader invalidation hints, never reader evidence or SDK/read/receipt authority. Closed worker cannot notify."},
+        {"names": ["inflight", "completed"], "lifetime": "At most 32 inflight/64 completed; same wire replay returns retained response only. One-shot image/attachment bodies replaced with replay error, never refetched. close suppresses late output and clears completed after cleanup."}
+      ],
+      "methods": ["constructor", "notify", "receive", "dispatch"],
+      "invalidation": ["strict parse/version/parameter bounds", "shutdown rejects new operations except state.get", "EOF/output failure closes worker; no transparent transport recovery"],
+      "trace": [
+        {"file": "src/editor-protocol.ts", "contains": "parseEditorOperation"},
+        {"file": "src/editor-output.ts", "contains": "editorOutput"},
+        {"file": "autoload/wbx/rpc_channel.vim", "contains": "function! wbx#rpc_channel#response"}
+      ],
+      "failure": "Distinguish frame/operation error, domain error code, bounded generic provider error and physical write failure. An RPC response is not a second mutation or delivery truth.",
+      "positive": [{"file": "test/editor.test.ts", "contains": "typed RPC dispatch preserves optional parameters"}],
+      "recovery": [{"file": "test/editor.test.ts", "contains": "demo editor engine selects explicitly, preserves Unicode plaintext"}],
+      "limits": ["Replay contract tests are distinct from end-to-end live service acceptance."], "checklist": []
+    },
+    {
+      "id": "W-state-output", "source": "src/editor-worker.ts",
+      "owner": "EditorRPC schedules presentation-only state coalescing; state-output classifies authority/evidence barriers",
+      "decision": "keep", "reason": "Coalescing is not another application snapshot cache; delivery/revocation evidence must not disappear.",
+      "fields": [{"names": ["scheduled", "pendingState", "pendingStateLane"], "lifetime": "One microtask latest-state reference per equivalent authority lane. Changed/unknown lane flushes prior state; microtask clears pending fields; close drops pending output. Outcome notifications remain synchronous."}],
+      "methods": [],
+      "invalidation": ["every unequal or unclassifiable state lane", "microtask flush, closed flag/output close", "no resnapshot or getter-side reconciliation at flush"],
+      "trace": [
+        {"file": "src/state-output.ts", "contains": "editorStateLane"},
+        {"file": "src/editor-worker.ts", "contains": "queueMicrotask"},
+        {"file": "autoload/wbx.vim", "contains": "s:apply(params)"}
+      ],
+      "failure": "Check preserved lane barriers and endpoint/event identity, not just revision/message count; same-turn bursts must retain evidence before bounded rings evict it.",
+      "positive": [{"file": "test/editor.test.ts", "contains": "RPC state microtasks retain the latest emitted payload"}],
+      "recovery": [{"file": "test/state-output.test.ts", "contains": "RPC same-turn bursts preserve every message-evidence and status barrier"}],
+      "limits": ["Recovery evidence here means output barrier/close behavior, not automatic reconnect."], "checklist": []
+    },
+    {
+      "id": "W-shutdown", "source": "src/editor-worker.ts",
+      "owner": "EditorRPC idempotent close/barrier; runEditorWorker stdio framing/EOF/signal ownership",
+      "decision": "keep", "reason": "Physical worker closure is different from session stop and optional media leave.",
+      "fields": [
+        {"names": ["closed", "shutdownId", "closing"], "lifetime": "Shutdown ID establishes synchronous admission barrier; close sets closed before awaiting cleanup and shares one closing promise. Cannot reopen; explicit new worker/hello required."}
+      ],
+      "methods": ["close"],
+      "moduleFunctions": ["runEditorWorker"],
+      "invalidation": ["valid shutdown request, EOF/signal/output failure", "pending callbacks may settle but cannot write after closed", "meeting leave failure returns sanitized final error and still closes"],
+      "trace": [
+        {"file": "src/editor-worker.ts", "contains": "const eof = () =>"},
+        {"file": "src/editor-protocol.ts", "contains": "class EditorLines"},
+        {"file": "autoload/wbx.vim", "contains": "function! wbx#shutdown()"}
+      ],
+      "failure": "A failed leave is not an invitation to retry toggle/join; final error closes exactly once. New connection is a deliberate handshake, not replay of inflight requests.",
+      "positive": [{"file": "test/editor-shutdown.test.ts", "contains": "valid shutdown rejects later mutations synchronously"}],
+      "recovery": [{"file": "test/editor-shutdown.test.ts", "contains": "failed leave still returns a bounded final error and closes"}],
+      "limits": [], "checklist": []
+    }
+  ],
+  "projectionFamilies": [
+    {"owner": "E-projection", "fields": ["revision", "state", "mode", "auth", "notice", "localContext"], "rule": "Application observation/session UI fence. Not credentials or verified profile."},
+    {"owner": "E-store", "fields": ["rooms", "room", "messages", "loading", "loadingRooms", "roomsStatus", "ready", "moreRooms", "moreHistory", "historyLatest"], "rule": "Store-derived bounded catalogue/selection/history with initial/cache gating. ready is selected-history readiness, not application state or protocol-ready."},
+    {"owner": "E-source-unread", "fields": ["readStatus", "readStatusNotice", "reactionSource", "messageEvents", "joinedMeetings"], "rule": "Source health/evidence versus retained unread; healthy or empty source metadata is not fresh per-room evidence. Joined-meeting observations are source/age-bound, read-only and grant no call, room or receipt authority."},
+    {"owner": "E-cache", "fields": ["spacesCache", "historyCached", "cachedReactions"], "rule": "Verified account display only: never current membership, ready-history, own removal handles or read status."},
+    {"owner": "E-storage", "fields": ["sections"], "rule": "Optional local preference projection, not server metadata."},
+    {"owner": "E-people-names", "fields": ["senderNames", "peopleStatus", "peopleSpaces", "peopleViewport"], "rule": "Optional private identity/presence display; peek getters cannot read services."},
+    {"owner": "E-agenda", "fields": ["upcomingMeetings"], "rule": "URL-free revision/age-bound discovery, not join authority."},
+    {"owner": "E-send-upload", "fields": ["uploadPending", "sending", "uncertain"], "rule": "Logical publication flags and selected-store possible-write evidence, not physical admission-release, remote absence or confirmed delivery."},
+    {"owner": "E-conversations", "fields": ["directPending"], "rule": "Logical direct-send indicator; exact transaction identity fences release."}
+  ],
+  "checklist": [
+    {
+      "id": "C1", "kind": "confirmed-defect", "status": "closed", "owner": "Native history syntax/view",
+      "finding": "Fixed: fallback header and contained timestamp share zone-less/UTC/offset/edited suffix grammar. Header syntax owns text colors; rail decorations no longer override whole-header text and mask timestamps. Original UI assertion and metadata-bucket/Markdown fixtures pass headless/drawn in both editors; new tests assert actual painted timestamp attributes. UI is included in maintained focused gates, with exclusion-drift regression.",
+      "evidence": [
+        {"file": "test/editor/ui.vim", "contains": "call assert_equal('WbxMessageTime', s:group(3, '2026-11-07'))"},
+        {"file": "test/editor/history-timestamps.vim", "contains": "painted timestamp uses Comment, not whole-header Title"},
+        {"file": "test/fixture-inventory.test.ts", "contains": "cannot be excluded from either focused editor gate"}
+      ],
+      "exit": "Fix fallback header timestamp containment/precedence without weakening the original assertion; original ui plus metadata-bucket syntax and native Markdown fixtures pass headless/drawn in both editors; remove ui exclusion from the acceptance gate."
+    },
+    {
+      "id": "C2", "kind": "confirmed-defect", "status": "closed", "owner": "ConversationActions reset / native unknown recovery",
+      "finding": "Fixed: metadata dispatch binds fresh authenticated self to the configured partition; reset moves possible-write evidence to a bounded inert retired section, leaving active maps empty. Explicit original-request recovery freshly verifies the partition, never replays a mutation or publishes old results. Native space/Team reset/reconnect and subsequent deliberate work pass in both editors. Cross-account/config/OAuth-profile evidence is refused without consuming original evidence.",
+      "evidence": [
+        {"file": "src/conversation-actions.ts", "contains": "this.retired.set(id, evidence)"},
+        {"file": "src/editor-engine.ts", "contains": "Original unknown space-action evidence unavailable"},
+        {"file": "test/conversation-reset-recovery.test.ts", "contains": "reset during submitted PUT retains unknown"},
+        {"file": "test/editor/conversation-reset-recovery.vim", "contains": "retired Team recovery uses current checked session"}
+      ],
+      "exit": "Add same-partition reset/reconnect unknown-metadata recovery regression and explicit new-account rejection. Provide a bounded original-request recovery lifetime compatible with native retained evidence, without blind cross-account adoption, automatic retry, weakening exact-request matching or treating reset as remote failure. Then prove a new deliberate operation succeeds."
+    },
+    {
+      "id": "C3", "kind": "coverage-gap", "status": "closed", "owner": "EditorEngine application failure/physical consumers",
+      "finding": "Closed by 36 controlled engine/RPC integration cases: application failure/stop/account replacement x draft open-load/save-load/save-port x metadata PUT/file upload x storage-first/network-first. All hold storage, content GET and a submitted write simultaneously, prove separate logical/physical cleanup and retained uncertainty, release work both before restart and into a ready replacement, and complete fresh storage/content/write workflows. No production defect was reproduced; runtime code is unchanged.",
+      "evidence": [
+        {"file": "src/editor-engine.ts", "contains": "private failed(message: string)"},
+        {"file": "src/editor-engine.ts", "contains": "private stopSession(clearReadCache: boolean)"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "all three physical consumers actually overlap"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "only one subsequent deliberate mutation was submitted"},
+        {"file": "test/mixed-cleanup-integration.test.ts", "contains": "retired storage cannot return text/profile or accept a stale commit"}
+      ],
+      "exit": "Add a bounded controlled-I/O matrix for auth/application failure, explicit stop and replacement: no late publication/cross-session clear, no physical overlap, unknown writes retained, no automatic retry; release held work and prove one new explicit operation succeeds. Fix only reproduced defects."
+    },
+    {
+      "id": "C4", "kind": "coverage-gap", "status": "closed", "owner": "SDK IPC -> engine -> EditorRPC -> native ingress",
+      "finding": "Closed: private bundles of actual editor-main and read-status-worker use default composition, real fork/IPC and worker stdio into Vim/Neovim, headless/drawn. Ready history, terminal SDK failure with stale/unknown Health, explicit source recovery/new epoch, exact deletion/self-revocation and stale-data rejection culminate in successful new selection/native work. Sanitized request/Health/process traces prove one editor worker, two SDK processes, exact ACKs and zero mutation/receipt/replay. Only synthetic auth/fetch/SDK boundaries and read-only I/O observation are substituted; runtime code is unchanged.",
+      "evidence": [
+        {"file": "test/editor/sdk-native-build.mjs", "contains": "src/editor-main.ts"},
+        {"file": "test/editor/sdk-native-recovery.vim", "contains": "source failure is not application failure"},
+        {"file": "test/editor/sdk-native-recovery.vim", "contains": "terminal source failure retires its source epoch"},
+        {"file": "test/editor/sdk-native-recovery.vim", "contains": "stale SDK and REST cannot restore revoked authority"},
+        {"file": "test/editor/sdk-native-recovery.vim", "contains": "each actual stdin request gets one stdout ACK"}
+      ],
+      "exit": "In preserved isolated builds only, drive a synthetic forked source through actual worker stdio and Vim/Neovim: ready history, source health failure retaining stale/unknown evidence, exact revocation or deletion reaching native ownership, and explicit recovery/new selection. Capture sanitized Health/source diagnostics and request trace; forbid live services and mutation replay."
+    },
+    {
+      "id": "L1", "kind": "external-acceptance", "status": "not-run", "owner": "Authorized live operator",
+      "finding": "Live People/reaction-return behavior and attribution of the original observed reaction delay remain unverified; offline synthetic progress does not establish actual service timing.",
+      "evidence": [{"file": "docs/editor-native-ux-review.md", "contains": "The exact live delay cause and post-activation acceptance remain unverified."}],
+      "exit": "With separate explicit live authorization, record normal return-to-space/presence/reaction freshness and layer timestamps without exposing identities, credentials or message content. Not required to produce this offline audit."
+    },
+    {
+      "id": "L2", "kind": "external-acceptance", "status": "not-run", "owner": "Authorized graphical/device/media operator",
+      "finding": "Graphical Kitty, camera/microphone/screen permissions and real media transmission/termination remain outside the offline acceptance scope.",
+      "evidence": [{"file": "docs/live-acceptance.md", "contains": "Kitty"}],
+      "exit": "With separate device/live authorization, observe preview versus transmission, graphical fallback, explicit same-owner recovery and confirmed leave; do not substitute tmux/demo or viewer disconnect for media truth."
+    },
+    {
+      "id": "L3", "kind": "external-acceptance", "status": "not-run", "owner": "Assistive-technology operator",
+      "finding": "Native text/drawn fixtures do not prove useful operator-observed assistive readout.",
+      "evidence": [{"file": "docs/editor-native-ux-review.md", "contains": "Operator-observed terminal/assistive readout remains"}],
+      "exit": "Record an operator walkthrough of normal selection, failure status and explicit recovery with their assistive setup; document limitations rather than claiming fixture output establishes usability."
+    }
+  ]
+}

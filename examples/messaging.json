@@ -1,0 +1,41 @@
+{
+  "leader": ",",
+  "theme": {
+    "background": "#101c18",
+    "foreground": "#d6e9da",
+    "muted": "#8aa697",
+    "accent": "#a5d78d",
+    "border": "#375446",
+    "focus": "#a5d78d",
+    "warning": "#ecc17d"
+  },
+  "messaging": {
+    "layout": "work",
+    "keybindings": {
+      "normal": {
+        "J": "move.down",
+        "K": "move.up",
+        "<leader> e": ["focus.compose", "insert"],
+        "<leader> f": "search",
+        "q": null
+      },
+      "insert": {
+        "<C-e>": "send"
+      }
+    },
+    "layouts": {
+      "work": {
+        "direction": "vertical",
+        "ratio": 0.25,
+        "children": [
+          { "panel": "rooms" },
+          {
+            "direction": "horizontal",
+            "ratio": 0.72,
+            "children": [{ "panel": "messages" }, { "panel": "compose" }]
+          }
+        ]
+      }
+    }
+  }
+}

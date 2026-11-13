@@ -1,0 +1,1995 @@
+*wbx-tui.txt*  Webex engine client for Vim and Neovim          *wbx-tui*
+
+wbx-tui uses native buffers, editing modes, windows, undo and mappings.
+Node owns REST/OAuth; a separate persistent tmux process owns meeting media.
+Loading this plugin never connects or captures devices.
+New native behavior is implemented and offline-validated in isolated builds,
+not live activated. See docs/verification-index.md for current source/gate evidence.
+Earlier missing-Vim records remain historical; later strict gates cover both editors.
+
+COMMANDS                                           *wbx-tui-commands*
+
+:Webex                 Connect using configured OAuth; open native workspace.
+:WebexDemo             Open synthetic messaging; no Webex connection.
+:WebexDisconnect       Stop/cancel messaging, not the tmux meeting.
+:WebexCompose          Focus the selected space's current normal/reply draft.
+:WebexReply            Reply to the history message under the cursor; never sends.
+:WebexCancelReply      Return to normal draft; retain reply text/undo/delivery.
+:WebexSpaces           Return to the spaces list at the open conversation.
+:WebexMarkRead         Explicit receipt; locate latest with :WebexLatest, unfold, R.
+:WebexUnreadStatus     Read-only unread provenance for the highlighted Spaces row.
+:WebexDestination      Inspect this draft's bound target/readiness; never sends.
+:WebexDrafts           Verified account-scoped recovery index; local snapshot only.
+:WebexDraftRestore     Restore only an already selected ready destination/root.
+:WebexDraftExport      Copy exact saved text to an inert native buffer; no fetch.
+:WebexDraftDiscard     Confirm discarding saved text, NEVER delivery uncertainty.
+:WebexPeople           Navigable native local People snapshot; no lookup.
+:WebexPeopleRefresh    Separate explicit provider read; opt-out/context guards.
+:WebexFilter [filter]  Local all/unread/direct/group/drafts/section:NAME view; no fetch/select.
+:WebexSections         Native local section actions / explicit preference choices.
+:WebexSectionCreate [name]  Create a client-local section, not a Webex Section/Team.
+:WebexSectionRename [name]  Rename the header's/chosen local section.
+:WebexSectionRemove [name]  Unassign its rooms; never leave/delete them.
+:WebexSectionToggle [name]  Collapse/expand its local rows.
+:WebexSectionMove N    Move the header's/chosen local section to position 1-32.
+:WebexSectionAssign [name|-]  Assign the selected room; - unassigns.
+:WebexSectionsLoad     Confirm loading private preferences for a verified profile.
+:WebexSectionsSave     Explicitly save under an already verified account/profile.
+:WebexSectionsClear    Confirm clearing that profile's preferences; not server data.
+:WebexAttach [path]    Stage one explicit local regular-file snapshot, max 10 MiB.
+:WebexAttachRemove     Remove this draft's file; never sends or retargets a POST.
+:WebexUploadCancel     Cancel this draft's active stage/upload; outcome may be UNKNOWN.
+:WebexAttachmentStatus  Inspect staged filename/size/status; no upload or backend start.
+:WebexEdit             Prepare a verified own-message edit in a separate native buffer.
+:WebexEditSubmit       Confirm non-atomic preflight policy, then submit this edit once.
+:WebexEditCancel       Discard preparation; retain native text (not an admitted mutation).
+:WebexDelete           Prepare/confirm deletion of the exact own history message.
+:WebexMutationResolve  Confirm you checked the exact unknown mutation; never retries.
+:WebexReactions        List reactions and who sent each; <leader>Wal.
+:WebexReadBy           Inspect disclosed message readers; <leader>Wav.
+:WebexReactionAdd      Choose a legacy reaction emoji to send it.
+:WebexReactionRemove   Prepare/remove only a freshly verified own reaction.
+:WebexReactionResolve  Inspect exact message in Webex, then unlock; never retries.
+:WebexReactionUnresolved Read-only local pending/unknown targets and request IDs.
+:WebexFormat [plain|markdown]  Explicit per-draft format; no argument opens a choice.
+:WebexMention          Choose a validated selected-group participant; insert real markup.
+:WebexMentionAll       Conspicuous confirmed @all insertion; Send needs consent too.
+:WebexMembers          Explicit selected-room roster; partial/failed is not permission.
+:WebexMembersMore      Explicit next selected-room roster page; no automatic drain.
+:WebexDirectVisibility  Own direct-membership API flag, NOT product Hidden/mute sync.
+:WebexDirectVisibilityRefresh  Explicit same-session flag reread; no preference write.
+:WebexMemberAction     Exact unchanged participant row: DM preparation or removal.
+:WebexDirect [ID/email]  Resolve exact person; prepare a separate plaintext draft.
+:WebexDirectOpen       Explicitly select the confirmed returned DM room ID.
+:WebexConversationOpen  Open current recipient's confirmed DM, or last confirmed group.
+:WebexDirectResolve    Confirm inspection of unknown DM delivery; never replays.
+:WebexDirectCancel     Release recipient preparation; retain native draft text.
+:WebexCreateSpace [title]  Confirm one group creation; invitations remain separate.
+:WebexRenameSpace [title]  Confirm title-only standalone group rename; named-only.
+:WebexRenameTeam [name]  Confirm exact joined-Team rename; fresh Team moderator proof.
+:WebexDescribeTeam     Read/prepare exact joined-Team description; no PUT yet.
+:WebexTeamDescriptionSubmit  Confirm replacement with required unchanged name echo.
+:WebexTeamDescriptionCancel  Retire Team preparation; retain native text/full undo.
+:WebexDescribeSpace    Read/prepare a separate standalone description edit.
+:WebexDescriptionSubmit  Confirm description replacement and required title echo.
+:WebexDescriptionCancel  Retire preparation; retain native text and full undo.
+:WebexDescriptionClear  Confirm removal from an unchanged description preparation.
+:WebexLockSpace        Confirm moderation of own private standalone space.
+:WebexUnlockSpace      Confirm unmoderation with fresh moderator proof.
+:WebexAnnouncementOn   Confirm announcements in an already moderated space.
+:WebexAnnouncementOff  Confirm announcements off; space stays moderated.
+:WebexInvite [ID/email]   Confirm one invitation after fresh identity/role checks.
+:WebexRemoveMember     Choose membership from :WebexMembers; moderator proof needed.
+:WebexLeaveSpace       Delete only YOUR membership, never the room for everyone.
+:WebexConversationResolve  Resolve retained unknown create/member/space metadata.
+:WebexTeams / :WebexTeamsMore  Lazy Server Team labels on already loaded rooms.
+:WebexTeamFilter [ID]  Filter loaded associations or choose an unchanged Team row.
+:WebexSend             Explicitly send text and/or one staged file from its bound draft.
+:WebexRefresh          Refresh spaces or selected history.
+:WebexRefresh!         Discard edits in the current Webex view; resume updates.
+:WebexPickSpace        Pick a listed space (optional native/plugin picker).
+                      Labels omit space/Team IDs; callbacks keep exact targets.
+:WebexMoreSpaces       Load the next page of spaces.
+:WebexOlder            Load older history in the selected space.
+:WebexLayoutReset      Directly reset owned layout preferences; not a submenu.
+:WebexThreadFold       Toggle whole loaded thread (legacy bodies if ungrouped).
+:WebexLatest           Go to canonical newest ID; no fold opening/read consent.
+:WebexBookmark         Toggle LOCAL session-only bookmark (not Webex Flags).
+:WebexBookmarks        On-demand local bookmarks; unloaded sources are inert.
+:WebexQuote            Capture same-space copied text, not a native quote/forward.
+:WebexQuoteInsert      Append capture to plain draft, one native undo; never send.
+:WebexQuoteDetach      Explicitly detach copied-text source guards; text unchanged.
+:WebexThread           LOADED/PARTIAL thread view; Enter jumps to main history.
+:WebexContent [files|links|media|cards]  LOADED matching messages; no fetch/open/download.
+:WebexCards            LOADED card-text messages only; every card action stays inert.
+:WebexJoinedTeams      Explicit bounded joined-Team query; NOT public/org discovery.
+:WebexJoinedTeamsRefresh / :WebexJoinedTeamsMore  Fresh query / ONE next page.
+:WebexJoinedTeamFilter  Exact row ID filters already-loaded spaces; never joins.
+:WebexDirectory [name prefix]  Explicit company-directory prefix query; no presence.
+:WebexDirectoryRefresh / :WebexDirectoryMore  Explicit current query / next page.
+:WebexDirectoryDirect  Prepare DM for exact directory row ID; never sends.
+:WebexProfile [exact person ID]  Explicit selected-person textual details only.
+:WebexProfileRefresh   Fresh textual read for the SAME exact ID/session; never polls.
+:WebexThreadFetch      Explicit remote source/root/first replies page (not Wvh).
+:WebexMentions         Selected-space API @me results; @all coverage unverified.
+:WebexQueryRefresh / :WebexQueryMore  Explicit current read / next bounded page.
+:WebexQueryMessage     Open inert retained result body, no provider request.
+:WebexQueryJump        Jump only to an exact already-loaded main-history message.
+:WebexQueryReply       Prepare existing exact-root reply draft from queried thread.
+:WebexThreadReply      Reply from loaded history or a current queried thread.
+:WebexImage [1-4]      Open image at cursor (first otherwise); image_open chooses viewer.
+:WebexImageBuffer [1-4]  Open original-derived pixels in a separate native buffer.
+:WebexImageExternal [1-4]  Explicit configured graphical/terminal viewer; never automatic.
+:WebexAttachment [1-10]  Open attachment: native text/image view or configured handler.
+:WebexAttachmentDownload [1-10]  Choose a new destination; download original bytes.
+:WebexUpcoming         Refresh schedule and joined-elsewhere observations; no auto-join.
+:WebexCacheClear       Clear the verified account/profile spaces cache; not drafts.
+:WebexActions [index]  Contextual native reference: effective keys, prerequisites,
+                       recovery commands and map conflicts; q returns, / searches.
+                       Index: all (default), available, context, or group:
+                       workspace/messages/message-actions/files/conversations/
+                       views/meetings/recovery. Snapshot only; Enter executes nothing.
+:WebexResolveDelivery  After checking delivery, unblock an uncertain space.
+:WebexAuthRefresh      Explicit messaging OAuth refresh.
+:WebexHealth           Local checks; never signs in or inspects secrets.
+                       rpc_requests: pending/queued counts and last allocated ID.
+                       Counts never imply delivery, cancellation or permission.
+                       protocol_ready reports transport negotiation, not messaging
+                       authentication. Messaging failure does not disable an
+                       independently ready meeting; transport loss does.
+:WebexNotificationsTest  Test configured local notification delivery; no backend start.
+:WebexNotifications    Native local status/mute/resume/test choices; not account DND.
+:WebexNotificationsMute [minutes]  Mute for 1-1440 minutes (default 30); no backlog.
+:WebexNotificationsResume  Resume future notifications; no replay of muted events.
+
+:WebexMeeting [URL]    Start/reuse a Webex call; prompts for HTTPS URL if absent.
+:WebexMeetingDemo      Synthetic participants/share, no Webex or transmission.
+:WebexMeetingEditor    Attach the existing call in a native editor terminal.
+:WebexMeetingKitty     Present the same call in a side Kitty window.
+:WebexMeetingDetach    Detach only the editor tmux client; call survives.
+:WebexMeetingStatus    Open the native meeting status buffer.
+:WebexMeetingSources   Choose reported source slot (bounded, not full attendees).
+:WebexMeetingLayout    Finite owned pane/layout choices; no media/config writes.
+:WebexMeetingAuthRefresh  Explicit meeting OAuth refresh, separate from messaging.
+:WebexMeetingReconnect  Verify/reconnect original controls; no rejoin or replay.
+:WebexLeave            Explicitly end the meeting.
+:WebexMicrophone       Toggle microphone transmission (initially OFF).
+:WebexCamera           Toggle camera transmission (initially OFF).
+:WebexShare            Toggle screen transmission (initially OFF).
+:WebexPreview          Separate opt-in local preview; never sends it.
+:WebexAudio            Toggle received audio.
+
+Closing a view/editor detaches by default; it does NOT prove sending stopped.
+Inside a meeting's tmux panes, q/Escape/Ctrl+C also explicitly leave the call.
+Lost viewer transport means controls unavailable/media unknown, not call ended.
+Quitting a disconnected viewer closes only that view; reattach/leave explicitly.
+
+SETUP                                               *wbx-tui-setup*
+
+Requires Node 22.12+ and npm. Build: npm ci && npm run build
+Verify the plugin: npm run verify:plugin (builds before headless editor tests).
+CI: WBX_STRICT_EDITORS=1 npm run verify:plugin requires both full Vim and Neovim.
+The baseline verifier disables inherited graphical/media test opt-ins.
+Add the checkout to 'runtimepath' or your plugin manager.
+LazyVim: put the complete examples/lazyvim.lua spec in
+~/.config/nvim/lua/plugins/wbx-tui.lua and adjust dir. Do not add a second lazy
+setup or manual runtimepath entry. The spec uses opts/main and preserves your
+LazyVim global save key/statusline. Use j/k and Enter to open a space, i to
+compose, and Esc then <localleader>s to send. No selection command is needed.
+Build a local checkout first; :Lazy build wbx-tui can rebuild it explicitly.
+Vim needs +job +channel +timers; editor meetings additionally need +terminal.
+Neovim uses its native job/terminal APIs. No Lua is required for Vim.
+Meeting demos need Linux, tmux, Chrome/Chromium and Kitty/display or an editor
+terminal. Live meetings ALSO require npm run sdk (pinned browser SDK download),
+approved SDK participation rights and an authorized meeting. REST messaging and
+demos do not need that browser SDK. This download is NOT install:read-status.
+
+Common options (Vim): >
+  let g:wbx_tui = {
+        \ 'mappings': 1, 'send_with_ctrl_s': 1, 'statusline': 1,
+        \ 'leader_prefix': '<leader>W', 'folds': 1, 'people_status': 1, 'read_status': 1,
+        \ 'threaded_history': 1, 'upcoming_meetings': 1, 'message_borders': 'gutter',
+        \ 'rooms_width': 30, 'compose_height': 8, 'spaces_cache': 1,
+        \ 'meeting': {'display': 'auto', 'fallback': 'editor',
+        \             'headless_demo': 0, 'leave_on_exit': 0}}
+<
+Neovim: >lua
+  require('wbx-tui').setup({ meeting = { display = 'auto', fallback = 'editor' } })
+<
+Optional: config (explicit JSON path), backend (argv list), demo, picker.
+All native/Lua-forwarded keys/defaults: docs/native-options.md, generated-key checked
+against wbx#options#catalogue(). Lua-only callbacks/integrations stay local.
+Notifications default to editor delivery. See |wbx-tui-notifications| for privacy,
+desktop/hybrid opt-in, reminder times, independent toggles and bounded coverage.
+send_with_ctrl_s defaults to 1 for compatibility. Set it to 0 to preserve your
+save key without disabling navigation. mappings=0 disables both buffer defaults
+and the global command family. Commands and Plug targets remain available.
+If using an earlier LazyVim recipe with mappings=false, change to mappings=true
+and send_with_ctrl_s=false; no user config is rewritten by the plugin.
+read_status defaults to 1; set 0/false to opt out. The optional SDK must already
+be installed (npm run install:read-status); nothing installs or connects for you.
+The SDK needs spark:all (including spark:kms); scopes are never auto-broadened.
+It runs in a separate Node process, not a browser or meeting/media owner.
+With read_status=1 and spaces_cache=0, spaces and unread status load together; the first
+populated list already has unread styling. The loading row remains until both
+settle. SDK failure releases REST spaces with an unavailable-status notice.
+The default spaces_cache=1 displays muted stale metadata sooner, then
+fresh REST spaces without waiting for unread initialization; unknown stays unknown.
+display: auto prefers Kitty, editor forces editor, kitty requires Kitty/display.
+fallback: editor or error. headless_demo is demo-only; live headless is refused.
+leave_on_exit is off by default. Crashes cannot guarantee automatic leave.
+Opt-in leave-on-exit cancels queued startup and allows up to five seconds for
+confirmed media-owner termination. If confirmation fails, check tmux explicitly.
+
+Meeting status/borders inherit your tmux configuration by default. For the older
+engine theme, opt into "tmux": {"appearance": "theme"} in the engine JSON.
+The default is "inherit"; no global tmux appearance/keybindings are changed.
+
+LOCAL SECTIONS AND FILTERS                          *wbx-tui-sections*
+
+The default list stays flat. Section actions are explicit, versioned and limited
+to 32 sections/500 assigned room IDs. <leader>Wvs opens their native action menu;
+<leader>Wvf chooses a loaded/local filter. Named commands remain available.
+One room has at most one local section. Unknown/new rooms remain Unassigned.
+Filters and collapse hide rows, not the selected destination/history/draft.
+Headers cannot select rooms; Enter toggles the exact local section instead.
+Counts mean loaded/local rows and unread emphasis, not server totals. Collapsed
+headers and the all-loaded summary retain unknown/stale provenance; no receipt
+follows. Draft/reply/file badges and the drafts filter use only native memory.
+Use all to return to the complete loaded list and :WebexMoreSpaces for paging.
+
+Edits are session-only until the existing spaces_cache identity path has
+verified the account/profile. Save/load/clear then explicitly use that private
+key; there is no automatic save, lookup or configuration rewrite. Files contain
+labels/order/collapse and room IDs only (0600 files/0700 directory). Load rejects
+corrupt/foreign/version-mismatched documents without changing current grouping.
+Local preferences do NOT import/sync native Webex Sections or mutate server Teams.
+Previously saved grouping restores after the existing verified identity path
+only into an empty, unchanged session. Edits/clear/opt-out/account changes cancel
+late loads. No additional identity read, autosave or message-body persistence.
+See docs/local-sections-design.md for budgets, persistence and offline evidence.
+
+Presence defaults on in the selected-DM float, header and Spaces icons; no command
+is required. :WebexPeople opens native read-only local details; the float is separate.
+Active means recent activity, not
+guaranteed availability; stale/unknown/unavailable stay explicit. No roster-wide
+poll, inferred offline/busy, audio/video call distinction or custom-status text.
+
+LOCAL MESSAGING VIEWS                               *wbx-tui-local-messaging*
+
+<leader>Wab toggles a local bookmark; Wvb lists them. At most 128 exact identities,
+no stored bodies, no disk or Webex Flags sync. Disconnect/new session clears them.
+Choose/load the original selected space explicitly before jumping to a source.
+Wvh opens the loaded thread, ALWAYS partial even when its root is present.
+Wvg lists loaded file messages; :WebexContent links or media changes the filter.
+These lists perform no fetch, download, URL opener, mutation or receipt.
+Enter jumps only to exact, currently loaded, unchanged main history. Use Reply,
+Quote or attachment commands there. r explicitly regenerates; q returns; / searches.
+Annotations/promoted buffers/user mappings are retained; mappings=0 disables defaults.
+
+Waq captures bounded copied text from unchanged main history; Wai inserts it at
+the END of the SAME selected space's plain normal/reply draft. No silent format,
+destination or mention consent change. Attribution is a copied display label,
+not verified authorship/native service quote. Mention delimiters are neutralized.
+At most 3000 source bytes/eight sources per draft, with the normal 1000 UTF-16 /
+4000-byte final draft limit. Oversize refuses without truncating or partial edits.
+Native undo removes only the insertion; previous typing remains undoable.
+Send remains explicit and rechecks exact source/session/accessibility. If source
+is changed/unloaded after insertion, recapture or explicitly :WebexQuoteDetach
+(confirmation defaults to Cancel) to keep ordinary manually copied text.
+Detach never sends or edits the text/undo. Source guards may conservatively remain
+after native undo; detach explicitly when no longer wanted.
+An older backend without local-context-v1 explains unavailability, never guesses
+the account/session. These views are not server search, complete thread retrieval,
+remote galleries, multi-account support, pins or native Flags. Normal/reply draft
+recovery is a separate, default-on private plaintext feature; see
+|wbx-tui-drafts|.
+
+REMOTE THREADS AND SELECTED-SPACE MENTIONS            *wbx-tui-message-queries*
+
+<leader>WvH / :WebexThreadFetch reads the source under the cursor afresh, its root
+when distinct, and ONE replies page (at most three GETs). Wvh stays loaded-only.
+<leader>Wvi / :WebexMentions explicitly queries API @me results in the selected
+space. This is NOT an account-wide inbox and @all coverage is unverified.
+Known spark:messages_read/spark:all, a ready selected space, local-context-v1
+and message-queries-v1 are required; older backends cannot guess a provider.
+r refreshes explicitly; ]p fetches ONE next page; q returns; / searches loaded text.
+No per-keystroke/background lookup, automatic paging, retry or scope expansion.
+50 items/page, five pages/250 replies (+root) or mentions, 256 KiB retained item
+data/query, two-minute lifetime. Partial and budget/cycle/clipping labels remain
+visible. API exhaustion means at observation, not an atomic/future-complete view.
+Changed/nested/wrong-room source/root data refuses without inventing ancestry.
+
+Enter in mentions opens inert retained text (zero requests); Enter in a remote
+thread/detail jumps only to an exact already-loaded unchanged main-history ID.
+Unloaded/clipped targets never trigger a hidden fetch/room switch or nearest row.
+An exact reply hidden inside another thread's closed fold is refused rather than
+substituted with the root; open that native fold explicitly. Result jumps reset
+the paging baseline, so they cannot masquerade as upward edge motion and fetch.
+Files/actions and unsupported card content are omitted, not registered or opened.
+Supported card text can appear as inert body text. No query results enter
+main history, newest endpoints, notifications, unread state or receipt evidence.
+Rendering, opening/scrolling lists and status/help never mark anything read.
+
+WaR / :WebexThreadReply works in loaded history and, in a current queried thread,
+reuses the existing exact-root
+reply draft only while main history still references that verified root. Normal
+and reply text/full native undo remain separate. Enter/write still NEVER sends;
+existing explicit send, grant/parent/destination/one-shot/ACK checks stay in charge.
+Mentions cannot authorize arbitrary reply targets. Use main-history Reply there.
+Old account/room/selection epochs (even away-and-return), late results, expiry,
+annotations and promoted buffers cannot retarget requests or drafts.
+Live tenant/filter behavior is unverified; provider/security gates remain.
+
+JOINED TEAM LIST                                    *wbx-tui-joined-teams*
+
+<leader>WvT / :WebexJoinedTeams explicitly reads Teams the authenticated user
+belongs to. This is NOT public/organization discovery, native personal Sections,
+Team management or room membership/role proof. Existing Wvt / :WebexTeams keeps
+its loaded-room association label semantics; the joined query is separate.
+Requires joined-teams-v1/local-context-v1 and already-known spark:teams_read or
+spark:all. Missing support/grants explain unavailable, never reconnect or expand.
+
+r / :WebexJoinedTeamsRefresh starts a fresh same-session query, including when
+retained text is old. ]p / :WebexJoinedTeamsMore fetches ONE exact-revision page.
+q returns; / searches loaded text. No per-row, render, status or help-triggered
+requests, automatic pagination, retry, Team-detail or room/member scans.
+50 items/page, five pages/250 IDs, 64 KiB retained item JSON, two-minute query
+lifetime from first observation. Native JSON re-encoding remains bounded at
+128 KiB without raising the Node quota. Budget/cycle exhaustion stays PARTIAL.
+API exhaustion means at observation, not an atomic/current membership census.
+Labels are sanitized/clipped presentation only; exact IDs disambiguate names.
+Descriptions, roles, members, raw payloads, tokens and admin data are excluded.
+
+Enter / :WebexJoinedTeamFilter only filters currently loaded noncached spaces
+by the exact selected Team ID, through the existing local filter owner. If none
+are loaded, it explains the limit, NOT that the Team has no spaces. It never
+fetches rooms, selects a draft destination, joins/invites/posts or marks read.
+Old-session/stale/future/late/away-and-return/annotated/promoted results cannot
+silently install or retarget; old-session refresh/paging refuses. Clean unload
+restoration, user mappings/prefixes/opt-outs, native draft text/undo and independent
+meeting owners are unchanged. Live tenant/grant acceptance remains unrun.
+
+READABLE CARD TEXT                                  *wbx-tui-cards*
+
+Supported Adaptive Cards versions 1.0-1.3 display an explicitly read-only text
+subset in ordinary history: TextBlock, FactSet and nested Container/Column trees.
+Card strings are literal, not executable Markdown/HTML/templates/Ex/JavaScript.
+Existing plain/rich fallback text remains first. Unknown/new versions/elements,
+hidden/conditional subtrees, input defaults/IDs/data, actions and nested ShowCards,
+refresh/auth, images/media and URLs are never traversed, fetched or submitted.
+Generic omission/partial labels replace unsupported content, never raw JSON.
+This is readable content, NOT full layout support or an interactive card form.
+
+<leader>WvC / :WebexCards / :WebexContent cards lists only LOADED card messages.
+adaptive-card-text-v1 and local-context-v1 are required for this list; older
+backends explain absence rather than infer cards from body labels.
+Enter jumps to the exact loaded unchanged main-history message, NOT an action,
+URL or form. r regenerates locally; q returns; / searches already-loaded text.
+No new RPC, receipt, provider query, input collection or permanent pane.
+User mappings/opt-outs, annotations/promoted views, native undo/folds, session
+and destination guards are unchanged. Compatibility clients receive inert text
+only; these keys are for Vim/Neovim.
+
+Per message: ten content attachments inspected, 32 children/array, 128 nodes,
+depth eight, 2048 UTF-16 units/visible field, 4096 units/16384 bytes of card text.
+Combined message/card display stays within the existing 10100-unit budget.
+Limits are explicitly labeled, not silently treated as complete card content.
+Main-history metadata is only an inspected card count and partial flag, never
+an action ID, raw input, URL, provider role or write/receipt authority.
+All card actions require an independent future provider/privacy contract.
+
+TEXTUAL PERSON PROFILES                             *wbx-tui-profiles*
+
+<leader>WnP / :WebexProfile opens an on-demand TEXT profile for the exact current
+directory/member row ID, never its name/label. Or use :WebexProfile exact-person-ID
+explicitly; no name/email resolution, selected-peer probe or organization scan.
+An updated backend with people-profile-v1/local-context-v1 and an already-known
+spark:people_read/spark:all grant is required. No grant expansion or reconnect.
+
+Only display name, first name, last name, department, title and time zone are
+projected (120 Unicode characters/480 bytes each; 4096-byte DTO maximum).
+Missing, normalized or clipped fields are PARTIAL, never inferred. Exact ID and
+observation time stay visible. Private email/phone/org/admin data, status,
+lastActivity, custom status and avatar URLs are excluded. No avatar is fetched.
+This does not add self status/DND/profile writes or alter automatic presence.
+people_status=0 and sender_names=0 do not disable an explicit text-profile read,
+and the read never enables/enriches either automatic feature or notifications.
+
+r / :WebexProfileRefresh makes ONE fresh GET for the same ID/session, including
+when retained text is old. q returns; / searches; Enter is not a profile action.
+No background refresh, per-row/cursor request, write, receipt, DM or opener.
+Responses older than two minutes or future-dated beyond clock-rounding tolerance,
+old sessions, changed source rows and late/away-and-return choices cannot install.
+An old-session roster cannot supply a new-session profile target; refresh it first.
+Annotated/promoted buffers, user maps, mapping opt-outs, focus, unrelated draft
+text and full native undo are preserved. Close/rename annotated views explicitly
+before generating another profile. Retained profile text is not action authority.
+Live profile/tenant/grant acceptance remains separate from offline verification.
+
+DIRECTORY PREFIX SEARCH                             *wbx-tui-directory*
+
+<leader>Wnp / :WebexDirectory prompts once for a literal name PREFIX (not substring).
+2-120 characters/480 bytes maximum; no empty/wildcard/organization enumeration.
+No per-keystroke requests, automatic refresh, presence/avatars or scope expansion.
+Uses already-known spark:people_read/spark:all through the fixed public REST owner.
+directory-search-v1 and local-context-v1 are required; old backends explain absence.
+50 results/page, five pages/250 identities maximum, query expires after two minutes.
+Partial/policy-limited results are not a directory census; no hit is not absence.
+Same-name rows show distinct exact IDs. r explicitly refreshes that prefix; ]p
+requests only its next bounded page. Enter prepares a plaintext DM for the exact
+row ID via the existing fresh identity owner, not a name/email. It NEVER sends,
+posts a placeholder, invites, joins a space or marks anything read.
+q returns; / searches already-loaded text. Annotated/promoted lists and user maps
+are retained. Lost/late/session-changed/expired results cannot target another user.
+No emails, phone numbers, roles, licenses, avatars or presence are retained in
+directory projections. Live tenant/grant policy acceptance remains separately gated.
+
+OUTGOING FILES                                      *wbx-tui-uploads*
+
+Use :WebexAttach in a ready normal/reply composer. The command chooses a local
+regular file and stages a stable snapshot, never sends it. File name/size appears
+in the statusline, not in sendable text. Enter/write/removal never sends.
+:WebexSend explicitly sends text plus the file, or a file alone.
+For Markdown plus ONE file, choose :WebexFormat markdown, stage with :WebexAttach,
+then use the same :WebexSend / <localleader>s binding. Enter still inserts a
+newline; writing never sends. A Markdown caption must be nonblank and within the
+existing 1000 UTF-16 / 4000 UTF-8 byte limit. Plain file-only sends are unchanged.
+<leader>Wua/ur stage/remove; Wuc/us cancel/status. Existing attachment
+open/download commands are unchanged.
+
+Symlinks (including parent paths), hardlinks, directories/FIFOs/devices, changed
+files and files over 10 MiB are refused. Original-file edits/replacements after
+successful staging do not alter the anonymous read-only snapshot. At most eight
+snapshots/20 MiB aggregate, one stage and one physical upload, no automatic queue.
+Stage/send deadlines are 8/60 seconds. Exact physical cleanup may outlive logical
+cancellation; admission is retained rather than silently overlapping operations.
+Mention preflight has a 20-second sub-deadline inside the same 60-second send.
+Targets are freshly checked (one exact membership GET per unique person, at most
+16); syntax/consent/group/grant failures produce no POST. @all needs separate
+default-Cancel broadcast consent; no cached roster or name grants permission.
+
+Removal edits the draft, not an already submitted POST. Use :WebexUploadCancel
+for explicit cancellation. After possible submission, cancel/timeout/loss is
+UNKNOWN: check Webex before :WebexResolveDelivery and any explicit retry. Nothing
+automatically replays. An old ACK clears only unchanged original text/file; newer
+text, replacement files, native undo and unrelated drafts remain untouched.
+Disconnect retains metadata as STALE and revokes old handles; reselect explicitly.
+
+Known existing messages_write/all grant required, no authorization probing.
+Production multipart goes only to the fixed public Messages API with no redirect,
+retry, auth replay, remote-URL upload or whole-file editor JSON. Bytes live in an
+anonymous FD, released on removal/ACK/session end after physical readers drain;
+process exit closes it. An empty private temporary directory may remain.
+Health/logs contain no filenames/paths. Progress uses bounded metadata/status-only
+redraw, not history rendering. Demo staging/sending is local, never contacts Webex.
+Markdown/file combination support is explicitly negotiated as the finite hello
+uploadFormats value markdown-single-file-v1, without raising the 32-capability
+ceiling. Separate uploads-v1 and markdown-send-v1 alone do NOT imply support.
+Old/missing support refuses before consent, never drops the file or downgrades.
+Consent rechecks exact session/selection/window/text/tick/format/root/draft/file.
+Only a raw exact-room/root/Markdown ACK with one allowlisted contents reference
+may clear the matching draft; it is not proof of remote file-byte equality.
+The shared delivery ledger retains 64 request identities per session; saturation
+refuses new IDs rather than evicting write evidence into resend eligibility.
+Multiple files remain unsupported; recipient-first modes use separate directFormats.
+No live Webex multipart/tenant/grant acceptance follows from offline tests.
+See docs/uploads-design.md for exact budgets, outcomes and offline evidence.
+
+MESSAGE ACTIONS AND RICH SENDS                       *wbx-tui-message-actions*
+
+:WebexEdit from an unchanged history prepares a verified own text-only message,
+never a history annotation. Edit in its separate native buffer, then explicitly
+:WebexEditSubmit. Writing/Enter never mutates. Submit and :WebexDelete require
+confirmation of the exact target AND a non-atomic conflict policy: a fresh GET
+refuses detected changes, but no conditional-write guarantee is verified, so a
+concurrent edit can race with PUT/DELETE. Cancel is the default. No moderator
+deletion; files/cards cannot be edited. Server limits (ten edits) remain
+authoritative; the client also caps locally observed successes at ten/message.
+
+Mutation outcomes are separate from new-message deliveries. Unknown blocks that
+message's mutations until checked and explicitly resolved; never automatic replay.
+Native edit text/undo and reply drafts remain intact. Confirmed deletion does not
+invent an earlier receipt endpoint; use :WebexLatest to revalidate if needed.
+Unknown deletion IDs remain resolvable without an edit buffer/history row.
+:WebexMutationResolve chooses exact retained targets in their selected room.
+Failed/older resolution responses cannot clear a newer unknown outcome.
+Disconnect makes preparations stale; resolve never resubmits or refreshes one.
+Contexts expire in ten minutes, at most eight; cancel unused preparation explicitly.
+Known people_read/messages_read/messages_write (or all) grants required; no new
+authorization. Old/disconnected backends refuse new helpers without reconnecting.
+
+:WebexFormat markdown deliberately sends Markdown, independent of syntax coloring.
+The native format chooser/counter never inserts guidance into sendable text:
+PLAIN/MARKDOWN, UTF-16 units/1000 and UTF-8 bytes/4000 are visible. Huge drafts
+show bounded lower limits (>1000/>4000), not an inaccurate exact count.
+Plaintext lookalikes stay literal. Real mentions use <@personId:ID|Label>; selecting
+one automatically enables this draft's Markdown format and filetype, but never
+sends. Neovim delegates to vim.ui.select and your configured picker/theme/keys;
+Vim uses its native popup_menu. No custom picker background is installed.
+Notification controls, sections/filters, participant/removal menus, meeting
+sources/layouts, recovery and attachment selection use the same native chooser.
+Escape cancels; stale, duplicate, out-of-range and superseded choices are inert.
+Mutation/recovery confirmation remains separate; Enter never sends a message.
+Duplicate labels have short
+identity suffixes, not full IDs. Mentions display as @Label, concealing the opaque
+target even while typing. Exact underlying markup remains native text for undo,
+copying and validated sending; :setlocal conceallevel=0 reveals it explicitly.
+The displayed @ is anchored at the label, not before the hidden target ID, so it
+does not become stranded on an earlier wrapped row. Legacy native conceal can
+still reserve blank wrapped rows for hidden IDs; no draft rewrite or global
+breakat change is used to hide this editor layout limitation.
+Individual person tags need no extra confirmation: explicit Send/Submit includes
+them. The backend still validates exact target IDs and fresh room membership;
+display labels never authorize a different identity. @all retains one separate,
+conspicuous confirmation when sending, as well as its deliberate insertion gate.
+Confirmation keys are Cancel (C) / Yes, continue (Y), defaulting to Cancel.
+An unqualified Enter accepts the default Cancel; Escape also cancels. A picker
+choice is not mutation consent. @all still needs its separate broadcast gate.
+Normal/Insert Enter and :write in drafts never invoke Send or edit/reaction submission.
+Isolated Vim/Neovim PTY checks drive actual native confirmation keys, including
+default Enter and Escape, without replacing consent helpers. This does not
+establish operator-observed assistive readout or live-service acceptance.
+Mention insertion places the cursor on real whitespace beyond the closing token,
+so a second mention cannot break the first. Completion suggestions are disabled
+locally in message drafts, including Markdown; normal files keep their settings.
+Published history displays structured mentions as ordinary @Label / @all native
+text, including <spark-mention ...>Label</spark-mention>, without doubling @.
+The user chose readable history copies over raw-tag yanks to avoid concealed-ID
+wrapping defects. Original message state and edit/send identity remain intact.
+Drafts retain exact raw targets; inline/fenced/indented code and plaintext
+lookalikes stay literal. Published mention layout does not depend on conceallevel.
+Whole mention labels use WbxMention, linked to the theme's Identifier by default;
+user highlight overrides are respected. No hidden tags are reintroduced for
+coloring, and literal/code lookalikes do not gain mention styling. Native word-wrap
+rules remain unchanged; no global breakat override is installed.
+Composer headers are revealed per window on entry, including native i, not only
+when their buffer metadata changes. Normal compose no longer announces full
+status/destination IDs; :WebexDestination explicitly inspects that information.
+:WebexThreadReply / <leader>WaR replies from unchanged loaded history or a current
+queried thread, reusing its exact-root draft. Query expiry/session/selection/edit
+guards remain intact; :WebexQueryReply remains the explicit query-only command.
+Partial rosters remain labeled; no email-mention fallback, avatar/presence scan,
+or inferred identity. :WebexMembers/More retain at most 500 members/ten pages,
+100/page, no background roster polling. F5 reuses this source.
+
+Sendable text remains bounded at 1000 UTF-16 units/4000 UTF-8 bytes; RPC limits unchanged.
+Ordinary Markdown create ACKs may contain normalized Markdown or HTML rather
+than the submitted source. Positive HTTP response, exact room/root, creation
+metadata, bounded rich content and a new message identity still must validate.
+History echoes arriving during the POST deduplicate; pre-existing/already-sent
+IDs, malformed replies and uncertain transport never clear a draft. Only the
+exact unchanged native pending draft clears on confirmed success; newer work
+and unresolved older UNKNOWN deliveries are never automatically cleared/replayed.
+Participant choices include explicit next-page loading, not per-keystroke requests
+or an automatic roster drain. Changed draft/focus/selection revokes old choices.
+Markdown plus one file uses the existing upload path when independently negotiated;
+unsupported combinations refuse, never silently downgrade. Format/draft identity enters
+new-message delivery matching; changing either during a send preserves newer text.
+No live acceptance, grant expansion or internal SDK feature follows.
+See docs/message-actions-design.md for transport, privacy, race and outcome bounds.
+
+DRAFT RECOVERY                                         *wbx-tui-drafts*
+
+:WebexDrafts lists verified saved/queued/unsaved normal/reply recovery records
+before their composers exist. Enter exports ordinary native text; r refreshes the
+local index, q returns, / searches. :WebexDraftRestore never selects a space or
+fetches a reply root: select/load the exact destination explicitly first.
+:WebexDraftDiscard confirms text deletion, refuses native-owned work, and keeps
+unresolved-delivery evidence. Export remains available for unloaded/inaccessible
+roots. Files, mention consent, receipt and send authority are never restored.
+Room-level [saved]/[unsaved] supplement native [draft]/[reply draft] badges; the
+Drafts filter includes verified unopened recovery. Use the index for exact roots
+and storage state. These are local snapshots, not a durability guarantee.
+
+Normal/reply draft text and Plain/Markdown format survive graceful editor
+restarts by default. Set persist_drafts=0 to disable disk autosave. Private
+plaintext lives in $XDG_STATE_HOME/wbx-tui-drafts (otherwise ~/.local/state),
+with 0700 directory / 0600 files and verified account/config-profile isolation.
+Restoration fills only unchanged empty exact-destination composers; never sends,
+fetches history, restores attachment handles or reuses mention/send consent.
+Pending/unknown delivery evidence requires the existing explicit inspection and
+resolution. Nonempty/promoted/changed buffers are never overwritten.
+
+Autosave is debounced 500ms and flushes before graceful disconnect/shutdown.
+The private document is bounded to 64 drafts / 1 MiB. One draft patch per RPC
+keeps the existing 32 KiB frame limit; above 24 KiB encoded per draft, export its
+native buffer explicitly. Unsafe storage, permission errors or concurrent-editor
+conflicts warn and retain native text rather than overwriting newer disk work.
+Abrupt termination/power loss is not a lossless-recovery guarantee. See
+docs/drafts.md for privacy, stale-lock and recovery details.
+
+Confirmed unchanged sends clear their drafts. A transient editor text/write lock
+retries only local clearing, never the POST; every retry checks exact unchanged
+text/revision/format/destination/session. Newer edits win. An uncleared confirmed
+sent copy cannot accidentally resend or resurrect as an unsent disk draft.
+
+CONVERSATIONS AND SERVER TEAMS                       *wbx-tui-conversations*
+
+These helpers require an updated connected backend. They never start/reconnect
+one. Wn/Wv mappings call their guarded owners; :WebexActions shows prerequisites.
+:WebexDirect accepts an exact person ID/email, not a name search. It resolves
+identity without sending a placeholder and opens a separate recipient buffer.
+Its first explicit :WebexSend confirms that it may create a persistent DM.
+Plaintext is the default. With independently negotiated directFormats, use the
+same :WebexFormat markdown (Waf), :WebexAttach (Wua), Remove/Cancel/Status helpers
+and explicit :WebexSend / <localleader>s for Markdown, one file with an optional
+plain caption, or Markdown plus one file. Separate mode support does NOT imply
+the combined mode; MF14 room-upload support does not enable recipient files.
+Unsupported combinations refuse before consent, never downgrade or drop files.
+First-send default-Cancel consent covers exact person/text/format/file; any
+session, window, selection epoch, tick, target, draft or snapshot change refuses.
+Real Markdown mentions/@all remain group-only; plain lookalikes stay literal.
+Enter/write never sends. Successful delivery binds the actual returned room ID;
+later sends use that ID. :WebexDirectOpen is explicit navigation, not draft
+adoption. ACK never selects a room or clears newer native text. Existing normal/
+reply drafts remain separate. Preparation: eight contexts, ten-minute expiry.
+Snapshots share the existing eight-reference / 20 MiB / 10 MiB-per-file budget.
+Fresh self/person checks precede one POST; no email/name/title retargeting.
+New modes require exact raw recipient/author/content/file evidence and a verified
+same-ID direct room. Missing recipient echo or a room GET failure after successful
+POST is UNKNOWN, not safe to recreate. No automatic download verifies file bytes.
+File preflight: 20 seconds inside the 60-second total send/ACK budget. Logical
+cancel/deadline does not free unsettled physical GET/POST/FD work. Markdown-only:
+20 seconds total. Ledger: 256 action identities, no evidence eviction/replay.
+Native undo, newer text/format/replacement files and notification preview privacy
+are retained. Only explicit Open navigates; recipient files never become normal
+room draft files. Offline tests are not live tenant/echo/file acceptance.
+
+:WebexRenameSpace [title] changes only the selected ready standalone group title.
+It is initially named-only; Wnr remains Remove Member. Requires independently
+negotiated spaceActions:["rename-v1"], known existing people/rooms/memberships
+read and rooms-write grants, fresh own membership and moderator proof if locked.
+Direct, all Team-associated (including General), cached and read-only spaces
+are excluded. No arbitrary settings, Team moves, lock changes or room deletion.
+Use an owned selected-space history/list/composer, not a promoted native file.
+The default-Cancel prompt shows exact ID/old/new title and the residual race:
+GET to PUT is NOT atomic and another client's rename/role change may intervene.
+Exact canonical titles: 1-80 Unicode characters / at most 320 UTF-8 bytes.
+At most three GETs and one {title}-only PUT in 20 seconds; no paging, retries,
+redirect/auth replay or automatic post-PUT read. Preflight title mismatch is
+CONFLICT with no PUT. Post-admission ambiguity is UNKNOWN: inspect Webex before
+:WebexConversationResolve, which carries original unknown request evidence and
+never sends/rolls back. A typed service refusal remains refused.
+Only exact ACK title/ID/type evidence updates the title; no lastActivity, unread,
+messages, receipt, notification or draft destination changes. Newer native work,
+reply roots, formatting, files, annotations, undo, focus and key opt-outs survive.
+The optional existing spaces cache uses its existing age/unread evidence, never
+freshness inferred from rename. Old replayed ACKs cannot undo a later name;
+already-in-flight room lists are fenced, not all later remote observations.
+Enter/write never rename/send. Offline verification is not live tenant acceptance.
+
+SPACE DESCRIPTION REPLACEMENT                         *wbx-tui-space-description*
+
+From an owned selected-space history/list/composer, :WebexDescribeSpace reads
+fresh bounded metadata into a separate plain native edit buffer. Edit normally,
+then :WebexDescriptionSubmit confirms once, default Cancel. All three description
+commands are named-only in :WebexActions; no Wa/Wu/Wn/Wv/Wm key is reassigned.
+Normal Send/EditSubmit/Attach/Format, Enter and writes never submit descriptions.
+:WebexDescriptionCancel retires preparation but leaves text/full undo intact;
+it cannot prove an admitted PUT unsent or resolve UNKNOWN evidence.
+
+Requires independent spaceDescriptions:["replace-v1"], not rename support alone.
+Known existing spark:people_read, spark:rooms_read, spark:memberships_read and
+spark:rooms_write (or applicable spark:all) are required at preparation AND
+submit, with fresh self/room/own membership and moderator proof if locked.
+Direct, Team/General, cached, revoked and read-only targets are excluded.
+The old description must be explicitly present and safely bounded. Missing/null
+does NOT mean empty; an explicit empty preimage may be replaced. No clearing,
+including the service's single-space sentinel, or arbitrary settings changes.
+Clearing is a separate explicitly negotiated action: |wbx-tui-space-description-clear|.
+New text must be changed/nonblank, LF-only, at most 1000 UTF-16 units / 4000
+UTF-8 bytes, with no TAB/CR/unsafe controls or normalization. Inert text stays
+exact; no Markdown/HTML, Ex execution, URL fetching or attachment handling.
+
+IMPORTANT: the public PUT requires title. The only body is
+{title:expectedTitle,description}. Consent shows the exact room, title and old/new
+description, and discloses BOTH races: another description edit may be lost and
+the title echo may overwrite a concurrent rename. GET to PUT is NOT atomic/CAS.
+Each explicit step has 20 seconds total and at most three GETs; only Submit may
+add one PUT. No paging/retry/redirect/auth replay or post-PUT verification GET.
+Changed title/description preimage is CONFLICT, zero PUTs. Missing/mismatched
+raw ID/type/title/description ACK after admission is UNKNOWN, not success.
+Unknown rename/description/lock/announcement/description-clear blocks all five.
+Inspect Webex, then :WebexConversationResolve the exact original request/room;
+physical work must be idle. Resolution never sends, clears newer evidence or
+replays a mutation. A typed service refusal remains refused.
+
+At most eight active preparations, with a 120-second age checked after consent.
+Private native ownership, not a mutable buffer variable alone, authorizes submit.
+Completed/conflicted/canceled/expired/promoted/stale work needs fresh preparation
+from the selected-space source; old text/full undo remain. Late responses do not
+steal focus or adopt normal/reply/recipient/file drafts. Buffers use no swap,
+undo file or modelines; this is not durable draft storage.
+Description snapshots/results never enter main room/title/history/cache/unread/
+notification/receipt state. Offline tests are not live title-echo/tenant policy
+acceptance or full space-settings parity.
+
+SPACE LOCK / UNLOCK                                    *wbx-tui-space-lock*
+
+:WebexLockSpace requests false -> true (moderated); :WebexUnlockSpace requests
+true -> false (unmoderated). Both are named-only, no arguments or toggle, in
+:WebexActions. Existing Wa/Wu/Wn/Wv/Wm keys and Wnr (Remove Member) are unchanged.
+Use an owned selected-space history/list/composer; promoted/unrelated/recipient/
+description-edit buffers cannot authorize moderation. Text, full undo, replies,
+files, annotations, colorschemes and focus survive. Enter/write never lock/unlock.
+
+Requires independent spaceLocks:["lock-unlock-v1"], not rename/description
+support alone. Known existing people/rooms/memberships read and rooms-write
+grants (or applicable spark:all) plus fresh self/room/own membership are checked.
+LOCK requires fresh creatorId == authenticated self and explicit nonmoderator
+membership: the public update documents creator promotion to moderator.
+UNLOCK requires explicit fresh isModerator:true; creator status is not enough.
+Direct/Team/General/cached/revoked/read-only targets refuse. Fresh isPublic:false
+AND isAnnouncementOnly:false must be explicit; missing is not false/private.
+No automatic privatization, announcement clearing, moderator membership write,
+grant expansion, compliance or account/plan/tenant-policy bypass.
+
+Default-Cancel consent shows exact ID/title and the requested old/new state,
+not cached permission. Lock restricts shared membership/settings management and
+promotes the creator; unlock broadens shared management. This is not message
+freezing, encryption, archiving or meeting locking. The required PUT body is
+{title:expectedTitle,isLocked:locked}. Title echo can overwrite a concurrent
+rename, and moderation/role changes can race: GET to PUT is NOT atomic/CAS.
+Maximum three GETs then one PUT in 20 seconds total. No post-PUT GET, paging,
+retry/redirect/auth replay or queue. Precondition mismatch is CONFLICT, zero PUTs.
+Success needs raw exact ID/group/title/lock and private/nonannouncement ACK
+evidence; missing/coerced/mismatched evidence after admission stays UNKNOWN.
+All five space-metadata unknowns interlock per room, including description
+preparation. Check Webex, then :WebexConversationResolve the exact original
+request/room while physical work is idle. Resolution never sends/retries.
+
+The result reports this transition only. It does NOT publish main room/title/
+lock/cache/roster/role/history/activity/unread/notification/receipt state or infer
+which moderator memberships are preserved/removed after unlock. Future protected
+actions require fresh proof; explicit room reads may later show current flags.
+Offline tests are not live unlock/promotion/role/title-echo/tenant acceptance.
+
+SPACE ANNOUNCEMENT MODE                                *wbx-tui-space-announcement*
+
+:WebexAnnouncementOn requests false -> true; :WebexAnnouncementOff requests
+true -> false. These named-only, no-argument actions in :WebexActions are not
+a toggle or Send. Existing key families, Wnr (Remove Member), overrides and
+opt-outs are unchanged. Use an owned selected-space history/list/composer,
+not promoted/unrelated/recipient/description-edit work. Enter/write never
+change mode; native text/full undo, annotations, replies/files and focus survive.
+
+Requires independent spaceAnnouncements:["enable-disable-v1"], not lock or
+rename/description support alone. Both directions freshly prove authenticated
+self, exact own isModerator:true membership and an already locked, explicitly
+private standalone group. Missing/null lock/private/mode flags are unavailable,
+not false. Existing known unexpired people/rooms/memberships-read and rooms-write
+grants (or applicable spark:all) are required, never expanded. Direct/Team/
+General/public/unlocked/cached/revoked/read-only targets refuse. There is no
+implicit lock, private conversion, creator-based authority or role write.
+Off does NOT unlock/unmoderate the space.
+
+Default-Cancel consent shows exact room ID/title, explicit old/new mode and
+participant impact. On restricts posting to MODERATORS, BOTS AND INTEGRATIONS;
+others can still read, view files and join meetings. Webex NOTIFIES other people
+in the space when enabled; system messages can still appear. Off broadens
+posting subject to remaining policy, not a promise of unrestricted access.
+This is not silence, encryption, read isolation or meeting locking.
+
+Public PUT requires {title:expectedTitle,isAnnouncementOnly:announcementOnly}.
+Title echo may overwrite a concurrent rename; lock/mode/role can also race.
+GET to PUT is NOT atomic/CAS. Maximum three GETs then one PUT in 20 seconds
+total, no post-PUT GET/paging/retry/redirect/auth replay/queue. Changed title or
+mode precondition is CONFLICT, zero PUTs. Exact raw ID/group/title/locked/private/
+mode ACK is required; missing/coerced/mismatched evidence after admission is
+UNKNOWN. All five metadata actions and description preparation interlock for
+that room. Check Webex, then :WebexConversationResolve the exact original
+request/room while physical work is idle. Resolution never sends/replays.
+
+Results report only the transition, not ongoing state or posting permission.
+They never publish main room/title/lock/mode/cache/roster/role/history/activity/
+unread/notification/receipt state, synthetic system messages, delivery IDs or
+plugin-send exclusions. The Webex participant notification is not a fabricated
+local alert; same-account other-client alerts are not suppressed. Later protected
+actions require fresh proof. Offline tests are not live mode/role/notification/
+title-echo/tenant acceptance or full settings parity.
+
+DESCRIPTION CLEARING                                   *wbx-tui-space-description-clear*
+
+1. Run :WebexDescribeSpace from selected-space history/list/composer.
+2. Leave the prepared nonblank description UNCHANGED, then run the named-only
+   :WebexDescriptionClear. Edited text refuses before consent; undo or prepare
+   afresh rather than silently discard newer work. No arguments or new keys.
+3. Default-Cancel consent shows exact room/title/old text and destructive removal,
+   description-loss/title-overwrite races and conservative ACK handling.
+
+This requires independent spaceDescriptionClears:["single-space-v1"] plus
+existing replace-v1 preparation support, not replacement alone. Existing eight
+active / 120-second private preparations are reused, not a new draft/lease/store.
+Ordinary/reply/recipient/history/list/promoted/forged buffers cannot authorize
+clear directly. Empty/whitespace/sentinel old descriptions are not clear intents.
+Enter/write, blank :WebexDescriptionSubmit, Send and Cancel NEVER clear.
+
+Fresh known existing people/rooms/memberships-read and rooms-write grants,
+self/exact own membership and explicit private/nonannouncement Room proof are
+required. Locked spaces require explicit moderator:true; unlocked spaces need
+an explicit boolean own role. Creator/Team/cached labels are not authority.
+Direct/Team/General/public/announcement/cached/revoked/read-only targets refuse.
+Public spaces require a description: no automatic privatization or role/mode
+conversion. Fresh exact title/description mismatch is CONFLICT, zero PUTs.
+
+The only wire body is {title:expectedTitle,description:" "}: one ASCII U+0020
+space, owned internally, not user text or an empty-string fallback. Required
+title echo may overwrite a concurrent rename, while clearing may lose newer
+description edits. Roles/flags may also race; GET to PUT is NOT atomic/CAS.
+At most three GETs then one PUT in 20 seconds, no post-PUT read/paging/retry/
+redirect/auth replay/queue. Logical timeout does not free unsettled physical work.
+
+IMPORTANT: public docs define the request sentinel, NOT canonical clear ACKs.
+Only an explicitly present raw description:"", with exact room/group/title/
+checked-lock/private/nonannouncement evidence, confirms. Omitted/null/echoed
+space/other whitespace or nonempty ACK stays UNKNOWN. No trimming or inference
+from HTTP 200. Some tenants may always require manual unknown recovery.
+All five metadata unknowns block each other and preparation for that room.
+Inspect Webex, then :WebexConversationResolve exact original evidence while
+physical work is idle. No replay, rollback or inferred empty from resolution.
+
+Changed/conflict/unknown retires preparation but retains OLD native text/full
+undo. The sentinel never appears as edit text; an ACK never blanks it.
+A refused attempt may retain otherwise valid preparation. Cancel retains text,
+cannot retire an admitted write or resolve unknown. Reply roots/files/drafts,
+annotations/promotions, colorschemes, focus, navigation, Wnr and key opt-outs
+survive. Results never publish main room/title/description/flags/cache/roles/
+history/unread/notification/receipt state, fake messages or delivery exclusions.
+Offline tests are not canonical-service-ACK/live clear/title-echo/tenant acceptance.
+
+:WebexCreateSpace confirms a title-only group POST. Invitations are separate
+one-person operations: a failed invite never re-creates the room. Duplicate
+titles do not merge identity. :WebexMembers/More reads only the selected room.
+Lists: r refresh, ]p next page, Enter exact participant actions/Team filter,
+q safe return. Annotated/promoted views and their undo are never reclaimed.
+Invite checks fresh self membership/lock state; removal requires fresh moderator
+proof and the exact selected membership. :WebexLeaveSpace removes only your own
+membership. Confirmed OR unknown leave conservatively revokes local authority
+for that exact room for this session, retaining draft text/undo/history and
+marking its staged files stale; unrelated room files stay valid. Stale SDK/REST
+metadata and refresh never restore authority. Unknown is not "confirmed left".
+
+TEAM NAME ONLY                                         *wbx-tui-team-rename*
+
+From a clean fresh exact row in :WebexJoinedTeams, run :WebexRenameTeam [name].
+It reads a fresh raw Team name and moderator proof, prompts if name is absent,
+then confirms exact Team ID/old/new names and remaining races. Display labels,
+creator, cached/Room roles and loaded Team-space associations are not authority.
+Native text is never rename input. No global mapping is assigned; :WebexActions
+discovers it. Wnr stays Remove Member. Enter in Team lists still filters LOADED
+spaces only; r / ]p / q keep explicit query/paging/return, including opt-outs.
+Enter/write alone never mutate settings or send.
+
+Requires independent teamActions:["rename-v1"] plus existing conversations,
+joined-teams and local-context capabilities, and known unexpired people_read,
+teams_read, team_memberships_read, teams_write grants (or applicable spark:all).
+Configured scopes are not grants. No grant/auth/config/device expansion occurs.
+Preparation and submission EACH re-read self, exact Team and one complete
+Team membership page, at most 100 identities. The API has NO personId filter.
+Any paging/Link/overflow, foreign/duplicate/malformed identity, missing self or
+non-explicit true own Team isModerator refuses without scan/fallback/write.
+Preparation role is not reusable authority. Names must be changed exact safe
+1-80 Unicode code points / 320 UTF-8 bytes; no normalization or truncation.
+
+Each phase: at most three GETs in 20 seconds; submission adds at most one
+PUT /v1/teams/{teamId} with {name} ONLY. Total successful interactive flow:
+six GETs / one PUT. Existing eight-second physical, byte/read/IPC and single
+physical-admission limits remain. The new /v1/team/memberships path is bounded
+GET-only; no membership-ID subpath, person filter or role/preference write.
+No description/default echo, retry, redirect, auth replay or verification GET.
+Preflight is NOT atomic: concurrent name edits can be lost and roles can race.
+Optional-description preservation/tenant behavior is not live-validated.
+
+Only exact raw Team ID/name ACK confirms. Missing/coerced/mismatched/error ACK,
+post-dispatch timeout/invalidation or ambiguous failure remains UNKNOWN.
+Physical admission survives logical timeout/reset until native socket/DNS
+settles. Check exact Team/request in Webex, then :WebexConversationResolve:
+original evidence only, no replay. An older ACK/resolution cannot clear newer
+uncertainty. Shared 256-request ledger refuses saturation without eviction.
+After confirmed non-replayed rename, Team labels/selection are invalidated,
+not silently rewritten. Explicit joined Refresh reads a new revision.
+
+Session/query/revision/row/window/tick/age fences apply before/after preparation,
+prompt and confirmation. Abandoned/away-return rows, old sessions, notes or
+promoted lists cannot submit; late callbacks cannot overwrite newer work.
+Two-minute preparation/selection age is not a provider revision or durable
+identity. Preparation returns only session/Team/revision/time/name (<=4096
+bytes); membership/role/profile data remains transient and private.
+Main Room/title/cache/roster/history/activity/unread/notifications/receipts/
+delivery, local filters/sections and native reply/file/draft text/full undo,
+focus, colorschemes and mapping shadows remain unchanged.
+Separate description replacement is below. Other Team lifecycle/membership/roles, standalone moderator and
+MF22 preference writes remain provider-gated. Offline checks are not live
+permission/tenant acceptance; independent meeting ownership is unchanged.
+
+TEAM DESCRIPTION REPLACEMENT                           *wbx-tui-team-description*
+
+From a clean fresh exact :WebexJoinedTeams row, :WebexDescribeTeam reads fresh
+raw Team name/description plus current moderator proof. It opens a plain nofile
+metadata buffer in the on-demand list window, NOT a message composer. Ordinary
+native editing/search/undo works. :WebexTeamDescriptionSubmit confirms exact
+Team ID, required unchanged name echo, old/new description and BOTH risks:
+concurrent description edits may be lost AND name echo can overwrite a concurrent
+rename. Roles/permissions can race too; GET -> PUT is not atomic/CAS.
+:WebexTeamDescriptionCancel retires authority, retaining native text/full undo.
+No global key is taken; :WebexActions discovers all three named commands.
+Wnr stays Remove Member; joined-list Enter still filters loaded spaces only.
+
+Independent teamDescriptions:["replace-v1"] requires existing conversations,
+joined-teams and local-context capabilities; rename alone never enables it.
+Both phases use the same known existing grants and fresh self/Team/complete
+<=100-row explicit own-moderator proof as Team rename, with no personId filter,
+cached-role/creator shortcut, paging/drain/fallback or exported roster.
+Missing/null/coerced description is NOT empty. Explicit old "" can be replaced.
+Local safety bounds: 1000 UTF-16 units / 4000 UTF-8 bytes, LF-only safe strings,
+changed and nonblank replacement. These are not claimed provider maxima.
+Blank/no-op Submit, Enter or writing never clear/send. No Team-clear command,
+ASCII-space sentinel, implicit Markdown/file conversion or role/preference echo.
+
+Each phase <=3 fresh GETs / 20 seconds; submit adds ONE PUT with exactly
+{name:expectedName,description}. Whole flow <=6 GETs / one PUT. Existing eight-
+second physical, byte/read/IPC limits and shared single physical admission hold.
+No new transport path/provider, auth expansion, retry/redirect/replay/repair or
+verification GET. Exact raw ID/name/replacement-description ACK only; ambiguity
+after dispatch is UNKNOWN. Team rename and description uncertainty block each
+other (preparations too). :WebexConversationResolve requires original action/
+Team/request/manual check and idle logical/physical work; no IO or resend.
+Old ACK/resolution cannot clear newer uncertainty or revive a stale edit.
+
+Same private native preparation owner and EIGHT active Room+Team records
+COMBINED, not eight each. Six-field preparation is <=16384 bytes / two-minute
+age; rename's five-field 4096-byte bound is unchanged. Exact original joined
+query/session/revision/age still fences Submit; rename/Refresh invalidation,
+old callbacks, row-away-return, source notes/promotions or copied b: metadata
+cannot create authority. Submit also fences immutable preimage, native text/
+tick/window/session/age/plain metadata context around consent; Room/recipient/
+reply/file/Markdown/promoted contexts cannot be adopted. Room commands keep
+their own meaning and cannot adopt a Team preparation.
+
+ACK/cancel settles/retires private edit status only; user text/full undo remains.
+Unlike rename, description ACK does NOT reset/renew/invalidate/publish Team
+name/labels/joined query/cache. Main Room/cache/roles/history/activity/unread/
+notifications/receipts/delivery and local filters remain unchanged. Native
+files/drafts/reply destinations, focus, colorschemes and mapping opt-outs survive.
+Other Team lifecycle/membership/role/clear and existing provider/security gates
+remain binding; offline checks are not live name-echo/tenant/CAS acceptance.
+
+DIRECT-MEMBERSHIP API VISIBILITY                       *wbx-tui-direct-visibility*
+
+From an owned selected direct-space history/list/composer, run the named-only
+:WebexDirectVisibility. The read-only native view shows your own membership's
+API isRoomHidden flag: true, false, or Not provided. Missing is NOT false;
+malformed null/coerced API fields refuse. This is NOT Favorites, NOT server mute,
+NOT a complete product Hidden list or ongoing/cross-client synchronization.
+The equivalence to current Webex App Hide behavior is unestablished.
+Nothing is hidden locally; notification preferences/Favorites are not changed.
+
+Requires independent membershipVisibility:["own-direct-v1"] and the existing
+conversations/room-members/local-context capabilities. No new global key;
+:WebexActions lists both commands. In this view, r explicitly rereads the SAME
+own selected direct membership; q returns. Enter/write never send/change
+preferences; no paging/Enter action. Mapping shadows/opt-outs are respected.
+Annotations/promoted buffers, draft text/full undo, replies/files/destinations,
+focus, colorschemes and existing Wn/Wv/Wm families (Wnr Remove Member) survive.
+
+Fresh authenticated self, exact direct Room and exactly one exact own
+membership are read with existing known people_read/rooms_read/memberships_read
+grants. No write grant, caller person override, account scan or role inference.
+Group/Team/cached/revoked/unready targets, foreign/duplicate/paged identities,
+missing grants and invalidated contexts refuse without fallback. API flags
+never establish membership/write/receipt authority. Old-session Refresh refuses;
+an expired clean same-session view may only get a new explicit observation.
+Responses expire after two minutes; late/session/selection/window/tick changes
+cannot overwrite work or steal focus. Render/status/navigation do no reads.
+
+At most three GETs in 20 seconds total, eight seconds per physical call, with
+unchanged byte/read/admission limits. No PUT/POST/DELETE, redirect, auth refresh,
+retry, subscription, background poll, receipt or verification read. Timeout/reset
+cannot free a still-unsettled socket/DNS for another request.
+Only session/room/coverage/time/boolean-or-null (<=4096 UTF-8 bytes) are returned;
+no person/member ID, role, email, credential or raw profile is projected.
+Reads never publish main room/list/title/roster/history/cache/unread/notification/
+receipt/delivery state. API text says new messages can make a hidden direct room
+visible again; no other-client behavior is guaranteed. Favorites, product
+Hidden synchronization and server mute writes remain unsupported/provider-gated.
+Offline checks are not live preference/tenant acceptance.
+
+All writes are one-shot, no queue/retry/auth replay. Check Webex before explicit
+unknown resolution. Resolving does not send or restore revoked authority.
+Known existing grants are required, never inferred from configured scope wishes.
+people_read is needed for identity; messages_write/rooms_read for DM; rooms_write
+for group creation; memberships_read/write and rooms_read for membership; and
+teams_read for lazy Server Team labels (or known aggregate all).
+
+Server Teams are distinct from Local sections and native personal Webex Sections.
+Only teamIds on loaded noncached rooms authorize explicit label reads: eight per
+page, 32 cached labels, ten-minute positive/30-second negative retention. Coverage
+is always partial, not Team membership proof. 401/403/429 stops further lookups
+in the page; unattempted IDs stay not-loaded. Filtering never fetches/selects or
+retargets a hidden draft. No Team/room delete/move/bulk/admin operations exist.
+See docs/conversations-design.md for exact limits and offline evidence.
+
+NOTIFICATIONS                                       *wbx-tui-notifications*
+
+Enabled by default, editor-only. Neovim uses your current vim.notify function;
+existing Snacks/Noice/nvim-notify integrations work without setup or installation.
+Plain Vim or a failed notifier uses a native non-focusing message. Set
+notifications=0 (Lua false) to disable. For opt-in desktop delivery when unfocused: >lua
+  notifications = {
+    mode = 'hybrid', -- 'editor' default; 'desktop' always tries the system notifier
+    messages = true, meetings = true,
+    preview = true, titles = true, suppress_visible = true,
+    meeting_minutes = { 5, 0 }, -- before start, then at start
+  },
+<
+Use these keys in existing Lua/LazyVim opts. Plain Vim equivalent: >
+  let g:wbx_tui.notifications = {'mode': 'hybrid', 'meeting_minutes': [5, 0],
+        \ 'messages': 1, 'meetings': 1, 'preview': 1, 'titles': 1}
+<
+Desktop/hybrid opt-in uses available notify-send with a desktop-session hint,
+then terminal-notifier; unavailable/failed tools fall back to editor delivery.
+No notifier is launched in default editor mode. Hybrid relies on existing editor
+FocusGained/FocusLost reporting; unknown focus stays editor-only. No terminal
+policy, plugin override, DBus setup, OS permission or device setting is changed.
+Optional command=[executable, arguments...] appends title and body as literal argv.
+This replaces discovery, not a shell string; it must exit promptly (2-second
+deadline). No actions/click callbacks, joins, shell interpolation or retries.
+Cancel/disconnect revoke delivery but retain admission until the exact process
+exits, including across a new session or :WebexNotificationsTest; no fallback/replay.
+
+Message previews default ON: only the first 160 sanitized message characters.
+No New message label/count is added when an excerpt is available, including batches.
+Set preview=0 to hide message text AND sender. Empty/textless messages remain generic.
+Space became unread / Meeting starts in N min remain non-message labels. titles=0 hides
+space/meeting names too. Desktop notifications and plugin histories may retain
+visible content; selected tools are trusted, not sandboxed. :WebexHealth reports
+only notification settings/counts/enums, never payloads, tool argv or provider errors.
+Other-space excerpts follow this same default, with an updated backend
+(notification-previews capability). The effective preview setting is captured for the
+session; no reconnect is triggered automatically. Example Lua options:
+  notifications = { mode = 'hybrid' }  -- previews on; preview=false opts out in Lua
+The existing SDK listener supplies plain text; no extra message/history request
+is made. Attachments without text remain generic. Dispatch rechecks preview=0 to
+hide queued excerpts; source-side consent ends on disconnect/session replacement.
+
+Sender names default ON, with an independent opt-out before a new session:
+  notifications = { sender_names = false }  -- Lua; Vim uses 'sender_names': 0
+With enabled message notifications/previews and a known spark:people_read or
+spark:all grant, this shows Alice: excerpt and improves loaded history labels
+through one bounded directory, with optional verified disk restoration of positive
+names. Known-person reads require the existing
+grant; no grant expansion, reconnect, roster scan or avatar loads. Older backends retain
+existing labels/excerpts. Raw IDs stay Node-private. Unknown names stay excerpt-only.
+Lookup never delays a creation; only exact queued/undispatched alerts can gain a
+name. Coalescing pairs the last excerpt with its own sender. No late replay.
+Opt-out/revocation protects queued delivery and fallback, not an OS alert/tool argv
+already submitted. Names do not establish membership, presence or read authority.
+See docs/sender-names-design.md for limits and offline evidence.
+
+Selected-space messages need no optional SDK. Initial history, older paging,
+repeated polls, image/content updates and locally acknowledged sends are quiet.
+If focused on the complete unfolded newest body, alerts are suppressed. Returning
+to another space establishes a baseline, not a notification backlog. Other-space
+alerts require the already-enabled read_status SDK's public message-created
+listener. Confirmed fresh events notify even when unread remains false/true or
+its timestamp does not change. During known degraded/polling delivery only, fresh
+continuous authoritative unread activity may produce one generic alert, without
+an invented message count/excerpt. Matching late creations never duplicate it.
+Cached/unvalidated rows, initial history and replay/backlog stay quiet. The SDK's
+existing listener itself gets individual message details; the worker forwards only
+ID/space/time/self metadata, plus a bounded excerpt when the effective preview
+setting is enabled. A separately consented sender ID may reach the Node name
+directory, never editor RPC; full long bodies/files are discarded. No new message/history
+read, grant, SDK opt-in or reconnect is added. Same-account messages sent from a
+native/other client DO notify; only exact acknowledged plugin sends are excluded.
+While a plugin POST is pending, same-account events wait for its delivery ID so
+an early echo cannot notify after a space switch. Other-account events do not wait.
+Rebuild/restart for the new path; don't hot-source the coordinator. Safe
+notifications.message_events health shows state/received/other_space counts to
+distinguish listener setup, actual event arrival and native detection. See
+docs/global-message-events.md for evidence and coverage limits.
+
+Meeting reminders use only fresh API-visible cards from existing discovery: up to
+three host/invitee current-series meetings, not a complete calendar. Reminders are
+deduplicated by ID/start/lead time; reschedules have new occurrences, cancellation
+removes pending alerts, and stale/expired cards never authorize reminders. Local
+timers do not refresh providers or join calls. Lead times: at most four distinct
+integers 0-30 minutes; empty list disables reminders. Late discovery coalesces
+already-due lead times; start alerts are at most 60 seconds late.
+
+Per connection: bounded deduplication, 16 queued events, coalesced message bursts,
+12 deliveries/minute, 30-second queue age and one desktop job at a time. Saturation
+drops alerts, not a retry storm; health counts drops. Muting consumes future
+events, clears pending delivery and does not replay on resume. Stop/disconnect
+clears timers, queues and deduplication, never meeting ownership or drafts.
+Reconnecting baselines history; an imminent meeting may remind again in that new
+session. This is best-effort notification delivery, not a reliable alarm service.
+Exact local-send exclusion uses the new additive successful delivery messageId;
+older backends conservatively suppress one post-send batch (possibly concurrent
+incoming messages). Rebuild/restart draft-safely for exact exclusion. See
+docs/notifications.md for offline evidence and remaining live/Vim limitations.
+
+Local spaces cache:                                  *wbx-tui-spaces-cache*
+spaces_cache=1 is the default. Set g:wbx_tui.spaces_cache=0 or Lua spaces_cache=false
+before connecting to opt out. This is an editor/backend option, not engine JSON.
+After explicit sign-in, one bounded people/me GET verifies the account, using
+already-granted spark:people_read or spark:all. Missing grants/identity disable
+only caching; no scope, config, login or presence change is attempted.
+Space IDs, titles, types and ordering activity persist. With read_status=1, the
+metadata cache also stores only last-confirmed unread/read booleans and their observation
+times. This metadata file never stores tokens, messages, drafts, last-seen/message IDs, meeting URLs or
+identity-response details. Restored flags are ALWAYS unreadStale=1, never fresh.
+Cache data is private plaintext, NOT encryption. Files are owner-only (600), in
+an owner-only (700) wbx-tui-spaces directory under XDG_CACHE_HOME or ~/.cache.
+Up to 500 entries, a 1 MiB file bound, eight fixed account/profile slots and a
+six-hour maximum display age apply. Account/profile hashes, not tokens, identify
+entries; slot collisions are safe misses. Expiry ignores data, not secure erasure.
+Cached rows are muted WbxCachedSpace with an explicit STALE/browse-only footer;
+last-confirmed unread emphasis remains visible, and unknown rooms stay unknown.
+Enter/pickers/API cannot open them; neither sending nor receipts are admitted.
+Fresh spaces replace the cache in the background, preserving native row anchors,
+and are usable while unread initialization is still pending. Only fresh per-room
+SDK observations supersede restored flags. Metadata refresh, an empty healthy
+SDK snapshot and receipt ACKs cannot freshen/clear them or renew their six-hour
+age. read_status=0 does not restore or save flags. There is no extra cache option.
+Neither stale read=false nor stale unread=true authorizes a receipt or clears a
+failed automatic-receipt attempt. Details: docs/persistent-unread.md.
+No cached pagination cursor or pending action is replayed. Failed refreshes require
+:WebexRefresh, not automatic retries. Cache failures never disable live messaging.
+:WebexCacheClear removes both current verified profile cache entries and disables
+cache writes for this session; it does not clear drafts or other profiles. Turning
+spaces_cache off does not erase existing files. Unsafe/corrupt files fail closed.
+See docs/spaces-cache.md for cleanup, exact bounds and offline verification.
+The same spaces_cache option now enables a separate received-data cache under
+XDG_CACHE_HOME/wbx-tui-received (otherwise ~/.cache/wbx-tui-received): private
+plaintext, eight slots, 4 MiB/file, 256 names and 16 rooms x 32 recent text messages
+and reaction observations. Names refresh after six hours and expire after 24;
+text/reactions have independent six-hour limits. No credentials, own-removal
+handles, write contexts, pagination cursors, attachment URLs or image bytes persist.
+Saved history appears only after selecting a live listed room. It stays labelled
+stale display-only, with ready=0/historyLatest=0, until fresh history replaces it.
+It never becomes send, mutation, inspection or receipt authority. Details:
+docs/received-cache.md. Expiry/opt-out do not erase old plaintext files.
+This feature changes backend code: build explicitly and restart after preserving
+unsent drafts. No installed config or active build is automatically changed.
+
+Default config: ~/.config/wbx-tui/config.json; XDG_CONFIG_HOME and WBX_CONFIG
+are respected. Store oauth.clientSecret only in the local, owner-only JSON
+(chmod 600); never put credentials in editor setup, buffers or RPC.
+The native editor requires this configured secret; compatibility CLIs can prompt
+privately instead. It remains persistent plaintext in that original file.
+Access/refresh grants are session-only; quit does not revoke Webex consent.
+REST messaging uses configured OAuth, approved room/message read/write grants,
+space membership and the system browser (xdg-open), not an owned Chrome worker.
+Connected messaging and meeting owners lease one private in-memory refresh owner,
+so joining need not repeat sign-in. Standalone login remains available when not
+connected. Missing supported SDK grants fail explicitly, without broader consent.
+The editor and meeting retain independent lifetimes. See docs/shared-meeting-auth.md.
+See docs/oauth.md and docs/editor.md in the checkout for full setup/limits.
+
+GLOBAL COMMAND FAMILY                               *wbx-tui-keys*
+
+Normal-mode maps are global, prefix leader_prefix='<leader>W' by default.
+Existing conflicting maps are skipped, not replaced. :WebexActions shows actual
+effective bindings, the send hint and preserved conflicts; :WebexHealth includes
+the catalogue/conflicts. Optional which-key uses that same catalogue from
+autoload/wbx/commands.vim. Existing buffer-local aliases remain available.
+Prefix names: a Message actions, u Files, n Conversations, v Views, m Meetings.
+The s key remains Pick space, not a group. Labels use effective owned bindings;
+user shadows and mapping opt-outs are respected. Normal chrome shows state,
+not command tutorials; help and action/key menus retain command discovery.
+
+Suffix after <leader>W (or your configured replacement prefix):
+  w        Open workspace          s        Pick space
+  c        Compose                 p        Toggle selected-peer presence details
+  r / R    Reply / cancel reply    t        Toggle whole loaded thread
+  g        Go to newest message   mu       Refresh upcoming meeting cards
+  o        Open attachment         A        Download (choose new destination)
+  S        Explicit composer send  f        Refresh
+  l        DIRECT layout reset     d        Disconnect messaging; retain drafts
+  ae / ad  Own edit / delete       as / ac  Submit / cancel explicit edit
+  af       Choose Plain/Markdown   am / aM  Participant mention / deliberate @all
+  ua / ur  Stage / remove file     uc / us  Upload cancel / file status
+  nd / ns  Exact DM / group create no / nc  Open confirmed DM/group / cancel preparation
+  ni / nr  Invite / remove member  nl       Leave space (not delete room)
+  vp / vt  Participants / Teams    vf / vs  Local filter / section actions
+  vT       Explicit joined-Team list; Enter filters loaded spaces, never joins
+  vn       Local notifications (not account DND)
+  vP       Refresh selected-peer presence
+  mP / mL  Bounded source slots / owned pane and layout choices
+  mR       Meeting auth refresh (not messaging auth, never leave/rejoin)
+  mj       Join/reuse meeting      ms       Meeting status
+  me / mk  Present editor/Kitty     md       Detach view, keep meeting
+  ml       Explicit meeting leave  mm / mc  Microphone / camera sending
+  mp       Local preview NOT SENT  mh       Screen sending
+  ma       Received audio          ?        Actions/effective bindings/conflicts
+
+The composer displays destination/draft state without replacing your statusline
+or inserting guidance into draft text. Enter and writes never send.
+Replies retain attribution without repeating the parent body. Displayed image
+previews have no placeholder; unavailable/clipped previews keep useful labels.
+The on-demand native action reference includes uncommon recovery commands too.
+Discovery never fetches, sends, acknowledges, opens files or changes focus beyond
+its explicitly opened reference. q returns; edited/promoted references are kept.
+Wrong-context/missing-capability keys explain why without making a request.
+Pane choices need both backend and owner support. Source/layout revisions and
+exact sessions fence stale choices; ACK means owner-side completion, not dispatch.
+Unknown/partial/disconnected operations never replay. speaker remains fixed
+main/secondary geometry, NOT active-speaker following. Source slots are not a
+complete attendee/self/lobby roster. Transmission and inherited tmux styling
+are unchanged; preview remains explicitly NOT SENT.
+Delivery resolution now requires a destination-bound capability and successful
+matching ACK. Failed/late/changed-target ACKs retain native uncertainty; older
+backends explain unavailability rather than using a legacy unbound reset.
+
+PAGING AND GEOMETRY                                 *wbx-tui-layout*
+
+Deliberate cursor/viewport navigation near the spaces-list end or history top
+automatically requests one more bounded page. Only one request per dataset is
+in flight. Initial rendering/restoration never drains pages. Errors require
+manual :WebexMoreSpaces / :WebexOlder retry, not repeated edge requests.
+Limits remain 500 spaces / 500 loaded messages; loading, exhausted, error and
+memory-limit states are explicit. Paging never posts or acknowledges messages.
+A capped older view is not the newest endpoint; :WebexLatest reloads latest.
+Per-window cursor/topline anchors use message identity and intra-message/native
+view offsets, not only line numbers. Evicted anchors warn before using the
+nearest retained message. Clean unloaded projections can rebuild on reopen;
+edited/promoted projections retain protection. U9 follow-up validation is ongoing.
+
+Initial rooms_width=30 columns, compose_height=8 lines. Manual native sizes are
+remembered through shrink/grow/equalization and clamped on small terminals.
+:WebexLayoutReset / <leader>Wl directly reset owned size preferences, not a menu.
+Mixed tabs containing unrelated windows use only owned winfixwidth/winfixheight
+locks, with NO corrective shared-boundary resizing, including on reset. No global
+equalization change or unrelated window-option override is made.
+
+EDITING AND CUSTOMIZATION                           *wbx-tui-customize*
+
+Move j/k and press Enter on a space to open its history, like opening a file.
+Messages run oldest-to-newest, top-to-bottom. Opening a different space jumps to
+its canonical newest message. Re-entering the loaded space only focuses history,
+preserving cursor, viewport, folds and pages without a read/receipt. Duplicate
+opens during initial loading never cancel or replace that request. Background
+polls and incoming messages also preserve your reading position.
+History defaults to wrap and linebreak, with conceallevel=2 and concealcursor=nc
+for native Markdown display. FileType hooks and later :setlocal overrides win.
+Use conceallevel=0 to inspect Markdown literally. Received markdown is preserved;
+HTML-only bodies become bounded, inert Markdown, with no resource fetching.
+Webex image attachments have separate bounded inline previews (not arbitrary
+HTML/Markdown URLs). images='auto' defaults to real images on supported Neovim
+Kitty/ghostty Unicode-placement terminals, otherwise Unicode braille. Use
+images='unicode' to force braille or images=0 to disable automatic preview reads. An existing
+ImageMagick magick/convert executable decodes PNG/JPEG/GIF/WebP (first frame).
+No installer, persistent image cache or shell expansion is used. Unsupported
+formats/redirects/missing decoders stay labeled; no success is invented.
+Only visible unfolded attachment rows trigger authenticated reads. Previews are
+memory-only and never issue receipts/posts or change drafts. In tmux, existing
+allow-passthrough must permit graphics; the plugin never enables it. Pending
+images withhold automatic receipt eligibility; their later arrival never replays
+the open/receipt. See docs/messaging-media.md for exact bounds and limitations.
+:WebexHealth reports images.mode, reason and output route, without image data or
+terminal probes. Neovim 0.12 uses nvim_ui_send() to reach its attached TUI; older
+built-in TUIs use stdout, not the core's possibly missing /dev/tty. This output
+correction is editor-only: preserve drafts and restart, without hot-sourcing the
+main autoload or rebuilding an already-current backend. See docs/kitty-image-fix.md.
+
+Open or download attachments:                        *wbx-tui-attachments*
+:WebexAttachment [1-10] opens the cursor's loaded message attachment. Omit the
+index to select a numbered attachment when there are several; 0 cancels. The
+default command family uses <leader>Wo (open) / <leader>WA (download), respecting
+existing mappings. <Plug>(WebexAttachment) / <Plug>(WebexAttachmentDownload) are
+also available. History o / <localleader>o use the same open action, not an
+image-only command. There is no separate default <leader>Wa binding. On an inline
+image, open selects that attachment without a picker. No message send, read receipt
+or automatic OS opener is involved.
+
+Visible unfolded attachments show a safe filename and MIME type in history and
+the picker. Updated backends use header-only HEAD reads even with images=0;
+no body download, redirect or GET fallback is used merely for labels. Limits are
+16 message attempts / 64 files per selected-space visit, ten seconds per batch.
+Unavailable labels/older backends show "Name unavailable · type unknown".
+
+UTF-8 text/source opens in a new editable nofile buffer/split, with this session's
+filetype detection, hooks, mappings and undo. Remote modelines, swap and persistent
+undo are disabled locally. Later opens do not replace earlier edits or drafts.
+Text viewing is bounded to 1 MiB / 20,000 lines, excluding binary/control bytes.
+Other encodings/binary formats need an explicit external handler or download.
+Unhandled PNG/JPEG/GIF/WebP use the existing native image viewer via the same open
+action, following image_open. Matching file handlers override native rendering.
+:WebexImage commands remain available as explicit image-only controls. Automatic
+inline preview limits/attempt budgets are unchanged. With attachment-typed-open-v1,
+one explicit request fetches once and returns either original bytes or normalized
+PNG from those bytes. Native rasters retain 8 MiB input / 6,000,000-byte PNG /
+1600x1200 output limits; original-byte handler/download routes retain 6,000,000
+bytes. Unknown native rasters no longer inherit the generic 6 MB cap just because
+previews are disabled or unrelated handlers are configured. Clean source-bound
+image snapshots still reopen without GET. Legacy backends remain labeled and can
+use two reads; failed typed requests never automatically retry or downgrade.
+
+attachment-chunks-v1 additionally permits bounded one-credit transfer through a
+preflighted bundled local sink: 49,152 decoded bytes/chunk, at most 123 chunks,
+unchanged file limits. Integrity and explicit completion precede display/launch/
+save prompt. Transfer expires after 30 seconds (five-second idle timeout), without
+extending GET/conversion deadlines. A draining sink keeps its physical admission.
+Typed-only backends keep inline results; no failed-transfer fallback/refetch.
+Completed normalized PNG snapshots remain memory-only and reopen without GET.
+
+Configure extension or MIME handlers in existing Lua opts: >lua
+  attachment_handlers = {
+    ['.pdf'] = { argv = { 'zathura' } },
+    ['.csv'] = { argv = { 'visidata' }, terminal = true },
+  },
+  attachment_download_dir = '~/Downloads', -- optional; default current directory
+<
+Vim: >
+  let g:wbx_tui.attachment_handlers = {'.pdf': {'argv': ['zathura']},
+        \ '.csv': {'argv': ['visidata'], 'terminal': 1}}
+<
+Lowercase .extension keys override exact lowercase MIME keys.
+An empty extension dictionary suppresses a matching MIME handler. The private absolute
+filename is appended as one literal argv argument, without a shell or substitution.
+Configured handlers also override native text viewing. terminal=1 gives the tool an
+editor terminal; otherwise focus stays unchanged. Use foreground programs: exiting
+the handler removes its temporary file. Tools/caches are trusted, not sandboxed.
+
+:WebexAttachmentDownload [1-10] explicitly reads original bytes, then prompts for
+a destination. Clear the path to cancel. The parent directory must already exist.
+Saves create private (600) files, never overwrite existing files or symlinks, and
+remain until the user removes them. Downloads are bounded to 6,000,000 bytes and
+30 seconds. Text/tool opens use temporary 600 files in private 700 directories,
+removed on release/disconnect/editor exit or a 30-minute lease limit. SIGKILL or
+machine failure can leave temporary files. Native text buffers keep memory copies.
+
+Only registered attachments in loaded, revalidated spaces can be read. No URL,
+credential or download path crosses backend RPC. No grant, automatic reconnect,
+POST or receipt is added. Large bytes are one-shot, never state/replay/cache data.
+Late results cannot steal focus or prompt after leaving the original destination.
+Typed opens reserve native image admission before GET; if previews are busy, even
+an unknown file that might be text fails before fetching. Retry explicitly; no
+waiting queue is added. Native work retains admission through timeout/cancellation
+until it actually settles, including account replacement. Selection hints are
+bounded to 128 useful keys / 24,576 bytes, never argv or save paths. Relevant
+configuration changes and cursor departure revoke the intent, even away-and-back.
+Native raster metadata shortens the deadline to ten seconds from GET; unknown
+pre-header discovery can wait at most thirty seconds. Typed reads require HTTP 200.
+A matching typed backend and draft-safe rebuild/restart are required.
+See docs/attachments.md for all limits and configuration; never hot-source state.
+
+Explicit image viewing:                              *wbx-tui-image-opening*
+:WebexImage / <Plug>(WebexImage) uses
+image_open='buffer' (default) or 'external'. The explicit Buffer/External commands
+override that preference. Place the cursor on an image or its message; an optional
+1-4 selects that attachment, otherwise the image under the cursor or the first.
+Only loaded Webex attachment identities qualify, never arbitrary text/URLs.
+An explicit open reads the original attachment even with images=0; that option
+only disables automatic inline reads. Read bounds/ownership/receipt guards remain.
+The viewer is a single reusable nofile wbx://image buffer (filetype wbx-image), with
+Kitty graphics where supported and braille otherwise. Native :close/:bwipeout,
+splits, hooks and edits remain usable. Annotations/renames are never overwritten.
+This displays/exports original-derived pixels up to 1600x1200, aspect-preserving,
+without upscaling. Inline previews stay 240x144. Larger sources are downscaled;
+no detail is invented by enlarging a thumbnail. The history hint shows the actual
+default o binding (unless a native FileType hook owns it). External viewers receive
+the same higher-resolution PNG. Animated files use their first frame.
+This correction REQUIRES rebuilding the backend and a draft-safe editor restart;
+the earlier preview-only viewer needed neither. See docs/image-detail.md.
+
+No external opener is configured by default. For a non-graphical terminal: >lua
+  require('wbx-tui').setup({
+    image_open = 'external',
+    image_viewer = { argv = { 'chafa', '--format', 'symbols', '--' }, terminal = true },
+  })
+<
+Vim equivalent: >
+  let g:wbx_tui.image_open = 'external'
+  let g:wbx_tui.image_viewer = {'argv': ['chafa', '--format', 'symbols', '--'], 'terminal': 1}
+<
+For a graphical foreground viewer use e.g. argv={'imv'}, terminal=false (Vim: 0).
+The private PNG path is appended as one literal argument; no shell expansion,
+placeholder interpolation or automatic installation. Use foreground viewers, not
+forking openers such as xdg-open/open: their early exit would release the file.
+terminal=true opens a separate editor terminal; terminal=false preserves focus.
+Native hooks that redirect/annotate the new terminal or disconnect cancel launch
+without overwriting that work; stale callbacks cannot release a newer file lease.
+Only one external viewer is active at a time. Its temporary plaintext file (600)
+is in a random private directory (700), removed on exit, terminal wipe, disconnect,
+editor shutdown or the 30-minute lease limit. No URL/credential is handed off.
+External tools are trusted, not sandboxed, and may retain their own copies. Unlink
+is not secure erasure; SIGKILL/OS failure may leave temporary data. Buffer-only
+viewing creates no image file. See docs/image-opening.md for the exact contract.
+Quoted/forwarded blocks get a distinct label. The REST API does not reliably
+distinguish forwarding from ordinary quotes; provenance is never invented.
+Sender/time headers are not Markdown. Neovim 0.10+ defaults to a subtle gutter
+marker after native number/sign/fold columns, outside the message text. Separators
+remain blank, including between bodies containing sender-looking headings.
+Native syntax contexts are bounded per message; an unclosed fence cannot consume
+the next sender header. Optional installed Tree-sitter starts ONLY for composers;
+the plugin stops whole-buffer Tree-sitter on its owned history buffer.
+Wrapped continuations use a whitespace-only native hanging showbreak in gutter mode.
+Borders and indentation are not inserted into body yanks or outgoing text.
+Neovim uses inline extmarks for reply indentation, not in-text gutter rails.
+
+Message appearance:                                  *wbx-tui-message-borders*
+message_borders='gutter' is the Neovim 0.10+ default. The thin marker uses an ASCII
+| fallback when ambiwidth=double or native cell-width settings make it two cells.
+The history-only, window-local adapter delegates your exact statuscolumn renderer
+(including LazyVim/Snacks), preserving native numbers, signs, folds and click
+handlers. No Snacks configuration or global option is rewritten. A FileType hook
+or later explicit local statuscolumn/showbreak override remains authoritative;
+polling never reclaims it. Leaving/promoting history restores only owned settings.
+Set g:wbx_tui.message_borders='rails' (Lua message_borders='rails') before opening
+to retain the previous virtual corner/rail/end style and hanging showbreak rail.
+b:wbx_message_borders is a per-buffer override. Vim and older Neovim retain rails:
+Vim with virtual text properties uses those; older full editors use sign-column
+borders/parent labels, without inline indent. No backend rebuild is needed for
+this appearance change alone. Preserve unsent drafts, then fully restart the
+editor; never source the main autoload into an active session.
+
+History <localleader>r (default \r) / :WebexReply opens a thread-bound Insert draft.
+Replies indent two columns, grouped beneath their root, and show a parent preview;
+roots and each thread's replies are chronological. Set threaded_history=0 for
+the legacy global timeline. Backend messages remain canonically chronological;
+missing parents say "parent not loaded". Quotes alone never imply a reply.
+Answering a reply targets the Webex thread root. The composer banner/statusline
+shows Replying to ...; :WebexDestination exposes parentId. Esc then <localleader>R
+or :WebexCancelReply returns to the normal draft without discarding reply edits.
+Normal and (room, thread root) drafts are separate. Sending stays explicit, with
+matching room AND parent required before an ACK can clear an unchanged draft.
+After a confirmed reply clears, the composer returns to the normal room draft,
+retaining its text. Newer reply edits or another selected thread are left alone;
+focus never moves to another pane.
+Unknown delivery blocks every draft in that room until explicitly resolved.
+An older backend without message-replies capability refuses threaded sends.
+Update/build, then restart/reconnect explicitly; never source the main autoload
+into a running session, because that resets its draft/session ownership state.
+Native rendering caps body lines at 1000/message and 20000/view; a clipping notice
+disables read receipts from that incomplete display. No silent truncation/read ACK.
+
+Message body folds are enabled by default: g:wbx_tui.folds=1, or Lua folds=true.
+Set folds=0 globally or b:wbx_folds=0 per buffer to opt out. Native za/zo/zc work;
+untouched defaults start open and user hooks/explicit local/manual folds win.
+:WebexThreadFold / <leader>Wt / <Plug>(WebexThreadFold) toggle one outer thread
+fold from any member. Native za on its root header hides loaded reply headers
+and bodies; body folds remain nested, with independent choices preserved.
+Unrelated roots and honest loaded-reply counts remain. Fold choices are per
+window/message ID; body yanks, draft text and reply targets do not change.
+The trailing blank separator stays visible outside a collapsed thread. No extra
+buffer lines are inserted; one-line bodies still obey native 'foldminlines'.
+Latest navigation/receipts check the actual body endpoint, not the visible gap.
+Use :WebexLatest, unfold the endpoint and display its complete body, then R for a
+manual receipt. G only visits the last display row, not necessarily the newest
+message in grouped history. Latest navigation alone never issues a receipt.
+History i opens its composer in Insert mode; history Backspace returns to spaces.
+The first spaces load lands on a real room; explicit return restores the open
+room's row. Background updates preserve your browsing cursor and never focus
+history. Enter focuses history only after successful selection, and cancels
+that focus request if you leave the origin window/buffer while waiting.
+Composer Enter is a normal newline. Esc then <localleader>s explicitly sends
+(default local leader is backslash). Ctrl+s also sends unless send_with_ctrl_s=0,
+as in the LazyVim recipe. :WebexSend remains an alternative; writing NEVER sends.
+A send ACK clears only the unchanged original draft. Per-space drafts survive
+switching and disconnect; unknown delivery must be resolved before retrying.
+
+Spaces sort by recent activity, keeping the same room under your browsing cursor
+when reordered. Personal/direct names retain server-computed titles when there
+is no explicit title. Missing refresh titles never erase a known name. Truly
+unnamed direct spaces say Direct conversation, not Untitled space. No name is
+guessed from message authors, and no extra lookup/scope is needed.
+Name changes keep room/draft identities and unread state unchanged.
+Routine polls do not insert a loading row into loaded history;
+view updates preserve reading position. With read_status=1, confirmed server-unread
+space titles are bold and accent-colored by default (WbxUnread). No per-space
+status suffixes appear. The accent follows your colorscheme's Special foreground.
+Aggregate unread-sync health is in the footer/statusline, not the spaces header.
+Detailed safe notices remain in :WebexHealth. No per-room status suffixes are added.
+Unknown/unavailable server state is never silently treated as confirmed read.
+Successful explicit opening clears local unread emphasis independently, as below.
+Read titles use normal text, including the open space; only its
+● marker retains the WbxSelected accent. A separate WbxCurrent row background
+keeps the open space visible while browsing elsewhere and after read confirmation.
+It uses only the CursorLine background, falling back to Visual or underline;
+unread foreground/bold remain independent. Customize WbxUnread with native
+:highlight commands; default bold/accent styling follows the colorscheme.
+Metadata-only updates restyle titles without editing text or moving the reader.
+:WebexHealth includes read_status and its safe notice, without starting a job.
+One room lookup failure no longer disables unread sync for other spaces. Event
+stream failure falls back to periodic server refresh (normally every 60 seconds
+plus request time). Temporary full-refresh failure retains last-confirmed states
+as stale in a bounded session-local cache; never-observed rooms stay unknown.
+Explicit stop/account/profile changes clear that memory cache. Only the separate
+spaces_cache=1 + read_status=1 (native defaults) persists display-only last-confirmed bits;
+it never restores authoritative SDK read dates or receipt eligibility.
+Stale status cannot authorize receipts or clear failed automatic attempts.
+Recovery never retries a receipt, registers
+another SDK device or signs in again. Fatal failures include a fixed safe reason
+in the health notice, not SDK error text; they still require explicit reconnect.
+With read_status=1, mark_read_on_open defaults to 1: a successful explicit open of
+an unread space at the known newest, fully displayed message sends one receipt.
+If the automatic Read By lookup occupies the SDK first, the single receipt slot
+waits for it and rechecks source, room, newest endpoint and fresh status before
+one submission. This is not a retry, and Read By never sends a receipt itself.
+Canceled/failed/stale opens, edited/empty history, focus-neutral selection and
+polling never send it. Failed/unknown receipts are not automatically retried,
+including on reopening. Local emphasis now clears on a successful explicit open,
+independently of this receipt or its outcome. This also applies with
+mark_read_on_open=0 or unavailable/stale sync, without authorizing a receipt.
+An admitted explicit :WebexMarkRead clears locally too. Failed/cancelled opens,
+edited/promoted history and focus-neutral selection do not clear it. Resume opens
+clear local emphasis without refetching history, moving the reader or sending again.
+Server flags stay unchanged in wbx#state(); a separate bounded, session-only view
+overlay controls title emphasis. The statusline shows locally read N while waiting
+for confirmation, and :WebexHealth reports local_unread counts. New loaded messages,
+an endpoint leaving the bounded window, fresh SDK activity or a genuine later
+read-to-unread cycle restore emphasis. Repeated old flags, metadata, page prepends
+and image updates do not. Local overrides never enter disk caches or receipt
+admission and never clear a failed automatic attempt. See docs/local-unread.md.
+Set mark_read_on_open=0 for manual-only receipts. :WebexLatest then R explicitly marks
+through the latest loaded message read in Webex, without an automatic retry.
+Both automatic/manual paths require the known-latest body endpoint, including
+the final wrapped row, to be visible and unfolded. Edited, clipped, incomplete,
+capped older or scrolled-away history cannot issue it. Folds are never opened
+automatically to acknowledge messages.
+Missing SDK/scopes or worker failure do not disable ordinary REST messaging.
+
+:WebexUnreadStatus inspects the highlighted room row in unchanged Spaces, not the
+open conversation. Its read-only local snapshot separates published server
+READ/UNREAD/UNKNOWN and freshness at capture, unread-source readiness, cached
+metadata, session-only local override and resulting list emphasis. Title text is
+bounded/sanitized, never parsed for state; exact room ID is shown. Freshness uses
+the last published ready source and per-room stale/cache flags, not another
+lookup or a wall-clock guarantee. Missing flags remain unknown, not read; cached/
+offline flags are historical, not receipt authority. Syntax off and monochrome
+do not hide this text. Retained offline rows require no capability/backend start.
+Inspection never opens/selects, fetches history/status, changes local emphasis or
+sends a receipt/message, including with mark_read_on_open=1. Enter/write and row
+metadata are inert. q returns to the exact source window; reopen from a current
+Spaces row to refresh. Mapping opt-outs/conflicts and annotation/promotion
+protection remain. Accepted updates never auto-repaint/focus the snapshot.
+Headers, section/footer rows and edited/promoted Spaces views are refused; no
+open/nearest-row fallback is inferred. This is not a read receipt or unread count.
+
+Space catalogue discovery is tracked independently of spaces_cache. Pending,
+failed or unverified discovery is not "No spaces found"; that message needs a
+successful empty list with no next page. Empty pages with continuation make no
+absence claim. A failed refresh retains loaded rows and shows a failure notice.
+Use :WebexRefresh in Spaces to retry explicitly; rendering/snapshots do not retry,
+open or acknowledge a destination. Optional roomsStatus is a closed observational
+enum (unverified/loading/ready/failed), never membership/write/receipt authority.
+Supplemental SDK metadata cannot verify discovery. Older backends without this
+field stay unverified unless their explicit cache-verification bit supplies
+evidence. Cached browse-only and combined unread-startup gates are unchanged.
+
+Receipt transport preserves the real SDK acknowledgement chain but admits at
+most one mutating submission below SDK replay paths. Redirects, key-rotation
+resubmission and reused-socket replay are blocked; failure/unknown consumes the
+attempt. Independent one-shot review/focused checks are not full integrated-build
+or live acceptance. For read-only work, use mark_read_on_open=0 and no manual ACK.
+
+Use native insert/normal/visual modes, undo, registers, splits and colorschemes.
+No emulated modal editor, mandatory picker, LSP, AI or plugin downloads.
+Draft buffers use nofile with swap/undo-file/modelines disabled. Normal/reply text,
+format and unresolved-delivery flags autosave to private plaintext recovery
+storage by default when verified storage is available; persist_drafts=0 opts out.
+Files and sending consent are never restored. Export wanted work if recovery is
+disabled/unavailable; see |wbx-tui-drafts|.
+Renaming a buffer or changing buftype releases Webex ownership: it cannot send
+or be cleared by a late ACK. Only unchanged plugin-default maps are removed.
+To promote a draft: :file /your/path, :setlocal buftype=, then :write.
+Unrelated work at reserved wbx:// names is never adopted or overwritten.
+
+Edited spaces/history/status views pause replacement, including when hidden.
+Save a wanted copy before :WebexRefresh! explicitly discards that view's edits.
+Normal refresh preserves them. Edited spaces cannot select a destination.
+:Webex restores closed/wiped components without replacing unrelated windows.
+
+Set mappings=0 to disable defaults. Available mappings:
+  <Plug>(WebexOpen), <Plug>(WebexSelectSpace), <Plug>(WebexSpaces)
+  <Plug>(WebexCompose), <Plug>(WebexComposeInsert)
+  <Plug>(WebexReply), <Plug>(WebexCancelReply)
+  <Plug>(WebexSend), <Plug>(WebexRefresh), <Plug>(WebexMarkRead)
+  <Plug>(WebexThreadFold)
+Only WebexSend has an Insert-mode Plug target; the localleader send default is
+Normal-mode only. WebexCompose keeps Normal mode; WebexComposeInsert starts
+native Insert mode in the selected destination's owned draft.
+wbx#rooms() returns to spaces; wbx#compose(1) composes in Insert mode.
+wbx#select(id) selects without moving focus. wbx#select(id, 1) requests the same
+guarded, successful-selection focus as Enter. These APIs do not relax edited-
+view, buffer-ownership or reserved-name collision protection.
+Use statusline=0 with your own statusline. wbx#status() is plain status text;
+Neovim require('wbx-tui').status is usable as a lualine component.
+Existing buffer-local FileType/ftplugin mappings take precedence over defaults.
+wbx#destination([bufnr]) returns the owned draft target/readiness, or {}.
+wbx#buffer_status([bufnr]) includes that target and pending/uncertain state.
+Neovim wrappers are require('wbx-tui').destination and .buffer_status.
+Neither accessor starts a backend or replaces your own statusline.
+
+Filetypes: wbx-rooms, wbx-history, wbx-compose, wbx-meeting.
+Highlights use standard group links: WbxTitle, WbxMuted, WbxSelected, WbxWarning,
+WbxRoom, WbxKey, WbxMode, WbxStatus, WbxMessageHeader, WbxMessageTime, WbxQuoteLabel,
+WbxMeetingLabel, WbxMeetingCommand. WbxUnread defaults to bold with the Special accent.
+WbxCurrent supplies only the current-space background/underline, not title color.
+WbxMessageBorder styles virtual rails; WbxReplyContext styles thread context.
+WbxMessageGutter links to NonText and WbxReplyGutter to Comment, with no fixed RGB
+colors; native highlight/colorscheme customizations remain available.
+Native Markdown remains in history/drafts.
+User hooks: WbxBuffer, WbxState, WbxDelivery, WbxMeeting, WbxDisconnected.
+WbxMeetingEvent reports validated media status/presentation/source events.
+Hook data: g:wbx_tui_event (buffer hooks contain bufnr and kind).
+Snapshots: wbx#state(), wbx#buffers(), wbx#meeting_state(). No credentials.
+
+Neovim setup optionally uses installed composer Markdown Tree-sitter, which-key,
+Telescope/fzf-lua/vim.ui.select. Vim optionally uses fzf.vim. All are optional.
+Use treesitter=false / which_key=false or picker='builtin' to opt out.
+
+PEOPLE PRESENCE                                     *wbx-tui-people*
+
+Selected-peer presence defaults ON, as requested for client-style features.
+people_status=0/false opts out; Lua forwards it. Selected direct conversations
+automatically show a compact People float, DM header and Spaces icons.
+:WebexPeople / <leader>Wp opens read-only local details in a native split.
+Inspection never requests a lookup. Native
+wiring is in source; current validation is tracked in docs/verification-index.md.
+No live activation/config/grant change occurred.
+Known granted spark:people_read and spark:memberships_read (or applicable
+spark:all) are required before reads. Missing grants mean scope-required, never
+automatic reauthorization or added scopes. Explicitly-disabled/group/demo/disconnected
+states do not request people; history polling/paging and snapshots do not fetch.
+Room selection or :WebexPeopleRefresh may start bounded optional reads. Visible direct chats
+also load presence without being opened, via optional peopleSpaces=['visible-v1'].
+The selected/visible set refreshes every 60 seconds, or later under Retry-After.
+One engine timer shares existing admission/singleflight. Viewport/cursor changes
+report all actually visible direct rows (up to 128) through peopleViewport=['paged-v1'].
+Verified visible peers share People list-by-ID batches of at most 85 exact IDs;
+cold membership discovery uses two continuous HTTP readers for the whole reported
+batch, then fetches its statuses together. There are no two-person display turns
+or artificial pauses between roster pairs. Status GETs still have the rolling
+two-start/two-second ceiling. Both readers share one self bootstrap; Retry-After stays
+bounded even after cancellation. Fast responses are tested explicitly.
+Observed status is cached separately for up to 500 loaded live direct rows in the
+same session: scrolling away/back no longer erases or refetches a fresh badge.
+Verified peer mappings survive scrolling for at most five minutes (500 cached);
+unloaded/revoked rows are pruned. Cold rosters still need individual reads, so
+one-second cold completion is not guaranteed.
+Freshness, stale/expired display and capability/row/session invalidation still
+apply; hidden cached rows are not polled and presence is never saved to disk.
+observations remain visible while later rows get turns. Legacy backends retain
+the old eight-row submode. Hidden/annotated lists
+stop their reads. Group rows never become peers; other visible DMs still refresh.
+Disconnect, provider replacement, denial, missing grants and expired credentials
+stop polling; no auth renewal or grant change follows.
+Unknown, unavailable and stale are explicit. Inactive is NOT necessarily offline;
+organization/status-sharing rules may withhold presence. Custom-status text is
+UNSUPPORTED by this public Node/REST provider, not empty or implemented. No
+directory enumeration, roster-wide presence polling or status/profile mutation.
+Spaces show native gutter cues: 🟢 active, 📞 call,
+📹 meeting, ⛔ DND, 🖥️ presenting, 🌙 inactive (NOT offline), 🏖️ out of office,
+⏳ pending, ? unknown/unobserved/undisclosed. Known stale icons stay visible
+while refreshing with neutral styling; five-minute expiry becomes unknown.
+The cues also retain theme colors: active green/OK, busy red,
+inactive/out of office yellow/away; stale, unknown and unobserved peers neutral.
+Current clients retain observations for up to 500 loaded live direct rows;
+the relevance set is bounded at 128 visible peers plus the selected peer.
+Neovim 0.10+ uses a two-cell statuscolumn slot after the numbers, outside the
+space-name text area. Custom gutter/click formats are delegated/restored, and
+later explicit local overrides win. Vim/older Neovim use native signs instead.
+No inline presence text, buffer edits, undo changes or unrelated sign removal.
+Offscreen peers outside the bounded set are not polled; groups/cached rows have no dot. Idle expiry
+recolors only unchanged owned views, without text/undo changes or I/O.
+Override WbxPresenceActive, WbxPresenceBusy, WbxPresenceAway and
+WbxPresenceUnknown in your theme.
+Manual Busy is not DND: Cisco reports that the REST API can return Busy as unknown.
+Unknown/missing status cannot safely be relabeled Busy. Busy-style coloring covers
+documented call/meeting/presenting/DND; no alternate provider is activated.
+See docs/people-status.md for exact bounds, grant/identity checks and blocker.
+Details are a read-only local snapshot of the selected conversation, NOT the
+highlighted Spaces row. They also work offline or without grants. Newly generated
+people_status=0 views mask retained person/observation fields; existing snapshots
+stay inert native text, not live indicators. Local r / :WebexPeople regenerates
+published text only. Local q returns to the exact originating window if it still
+shows the same buffer; split/tab returns are independent. Native motions, search
+and copy reach complete Unicode fields, observation age and available activity/
+retry times, without syntax/color. Narrow views use native wrapping/options.
+Mappings=0 and user mapping conflicts win. Annotations/promoted buffers and full
+undo remain user-owned; nomodified cannot hide an annotation's changedtick.
+State, disconnect and late responses never repaint, close, reopen or focus details.
+Enter/write never send, acknowledge, select a space or look up a person.
+Details cannot authorize history receipts or count as focused-history visibility.
+Opening details dismisses the compact float for that selection. The passive
+float adds no provider reads, preserves native focus/full undo and refuses to
+repaint edited/promoted copies. Covered endpoint rows cannot authorize receipts.
+Same-account/application token renewal with unchanged grants preserves the
+People viewport, observations and minute timer; it never triggers a new lookup.
+Real grant/session/account changes retain their existing invalidation rules.
+:WebexPeopleRefresh / WvP is the separate explicit provider read. It requires an
+enabled known capability/grant, ready selected DM and matching People association;
+from details it also requires a clean owned snapshot of that same room/session.
+An A snapshot cannot refresh selected B. Snapshot metadata is only a refusal
+guard, not a provider target; the RPC still sends {}.
+"Presence off" means this session started disabled (or an explicit false overrides
+the new default). Remove that override or use people_status=true before a NEW connection.
+No command here silently enables it, reconnects or expands permissions.
+See docs/people-popup-design.md for the presentation follow-up and verification.
+
+PERSISTENT MESSAGE REACTIONS                         *wbx-tui-reactions*
+
+Experimental pinned-internal native reactions default on. Set reactions=0 in
+g:wbx_tui, or reactions=false in Lua setup, to opt out. Verified nonempty groups
+appear beneath loaded history messages on separate virtual lines; message text,
+copy ranges, blank separators and undo stay unchanged. Empty partial observations
+are quiet, not evidence of zero. Successful snapshots refresh after five minutes.
+With progressive-v1 negotiation, completed targets paint before slow siblings.
+The existing eight-target batch, three read chains and physical admission remain;
+only the final response settles the request. Legacy clients keep final-only replies.
+Settled failures back off for one minute. Transient busy/context refusals have
+at most three one-second read-only retries. Completed verified batch observations
+survive a deadline; unfinished targets are timeouts, never absence.
+Recoverable same-source outages retain muted last-observed labels without a
+cached suffix, without new passive reads while transport/backoff disallows them. Returning
+A -> B -> A reuses an unchanged exact loaded room/message/content observation
+immediately, even while B's physical read is pending. Temporary history loading
+does not replace its authenticated source. One least-recently-used presentation
+cache holds at most 64 entries across rooms, not per room; eviction/never-observed
+targets still need a read. This is not a network-latency guarantee.
+Name resolution/image-preview progress never evicts reactions: their source-
+content key is separate from the combined message-rendering key. Incomplete
+empty cached data stays quiet, never zero. View changes still fence callbacks,
+but do not themselves discard same-source observations. Legacy contexts without
+explicit retention proof stay view-scoped. Revocation, changed/deleted loaded
+targets, opt-out, account/session changes, terminal worker loss and source/grant
+replacement evict them. Presentation never grants read, receipt,
+inspection or mutation authority and cannot resolve retained unknown writes.
+Passive read failures preserve foreground messages/errors and do not generate
+notifications. Inspect finite reason categories and aggregate failed/pending
+target counts and cacheEntries in :WebexHealth under reaction_reads; no provider bodies/IDs are
+retained there. Explicit :WebexReactions failures still give one sanitized reason
+and health/refresh guidance. Protocol-invalid output, disconnects, mutation/receipt
+failures and uncertain writes are not muted. Retry/cooldown guards stay unchanged;
+unready/disconnected passive requests cannot start/reconnect or queue backend work.
+
+For ASCII fallback, set g:wbx_tui.reaction_display = 'text' in Vimscript, or pass
+reaction_display='text' to require('wbx-tui').setup({...}) in Lua. Default 'icons'
+uses shared emoji badges and emoji-plus-label pickers; text mode also applies to
+pickers. Invalid values fall back to icons. Text mode puts each
+supported group on separate virtual rows: Thumbs up, Heart, Celebrate, Smile,
+Laugh, Confused, Sad; other Unicode emoji use ASCII Emoji U+... codepoints.
+Supplied counters, including 1, remain visible. Unknown totals add no counter
+placeholder and are never treated as zero. A confirmed own Add without a known
+total shows ♥️ 1 (you) for your one contribution, not a complete aggregate.
+:WebexReactions still identifies unknown totals in details; no aggregate count
+is manufactured in the snapshot. Empty incomplete observations stay quiet.
+Icon mode shows ♥️ 1 (you) | 👍 4. Your reactions always include (you), with
+WbxHistoryReactionsOwn styling too. Self-summary mine evidence is display
+only, not a removal handle. Neovim styles each chip; Vim groups your chips on a
+separate highlighted virtual row, preserving native text and blank separators.
+Text wraps to the narrowest visible current-tab history split's text width,
+including gutters, without changing native wrap/breakat/window settings. Long
+known values continue on virtual rows rather than silently truncating digits.
+No cached suffix or passive "Reactions unavailable" footer is shown. Loading is
+quiet; error categories remain in :WebexHealth. Retained observations may be
+muted/stale; a color change does not mean a mutation happened. Resize uses
+the same cached observations, never new write/receipt/inspection authority or
+freshness. The existing reading anchor also covers multiline height changes,
+subject to native scrolling/buffer boundaries. Details remain :WebexReactions.
+This is neither complete-vocabulary/absence proof nor operator-observed terminal
+assistive-technology acceptance.
+
+Explicit commands show "reactions: waiting" in the originating history window
+while an existing passive read drains, then "reactions: reading" during admitted
+summary/preparation/inspection reads. The state-first token clears before a native
+picker/confirmation, on result/error or stale intent. Other splits do not inherit
+it. No loading row, text/undo/focus change or new popup is used for acknowledgement.
+Moving away/changing target, room, source or session fences the old intent;
+returning does not revive it. Revocation/opt-out also clear stale feedback.
+An admitted read still holds its reservation until settlement, so repeating a
+command cannot overlap it. Only the newest intent waiting behind passive work is
+admitted. A replacement backend session releases/fences its old orphan.
+Your statusline options remain yours; integrations may use
+wbx#buffer_status([bufnr[, winid]]) for plain text. No status token grants inspection,
+mutation or receipt authority, or implies that an uncertain write was resolved.
+
+Delayed badge-height changes compensate visible split viewports independently,
+preserving reading screen rows, cursor/text/undo/folds/focus and native options.
+Partial-line positioning follows your smoothscroll choice. With it off, an
+indivisible wrapped top line or buffer boundary uses the closest legal viewport;
+no fake padding or forced option is used, and compensation cannot request pages.
+
+:WebexReadBy           Read-only inline reader names; <leader>Wav.
+Opening a group or person discussion loads one snapshot for the latest loaded
+message, without changing cursor/focus or sending a receipt.
+From unchanged loaded history, inspect member read-through evidence for the exact
+message under the cursor, in groups or person discussions. Names only, sender
+excluded. Repeat on that message to refresh. No list opens or takes focus, no
+receipt is sent, and Wnr remains Remove Member.
+
+Personal discussions show "Read by <person name>" on one line, without a count.
+Groups show "Read by <n> [+]" with names folded by default. The message is never
+repeated. :WebexReadByToggle / <leader>WaV (capital V) expands/collapses the
+current group's names locally, with one person per row. This virtual disclosure
+does not alter native message folds, text/undo, focus, or issue a network read.
+Live results retain the newest disclosure choice even during a pending read;
+new message targets start collapsed. Mapping conflicts/opt-outs still win.
+Expanded group details show partial coverage and the check time, not an
+individual read time. Names wrap to the narrowest visible
+split's text width. Scroll there normally; inspection never scrolls for you.
+Live results are partial: the pinned
+SDK exposes last-seen message/activity watermarks, not exact individual read times.
+"No read receipts reported" never means nobody read it or "Unread by".
+Unknown/failed data shows "Read receipts unavailable"; retained old observations
+are labeled stale after five minutes or source degradation.
+
+Opening/reopening fetches once; explicit commands and SDK seen events refresh.
+No cursor-triggered reads, polling, automatic
+paging, new SDK connection or receipt. One session/source cache keeps at most
+32 snapshots across rooms; no reader names/status are persisted to disk.
+One local expiry timer repaints labels without fetching. At most 500 memberships
+are admitted and 128 readers returned. Names come from the membership projection,
+not extra per-person lookups. read_status=0 disables inspection and clears clean
+generated presentation. Annotated/promoted history remains user work.
+Late callbacks cannot replace a departed target's footer or steal focus.
+Existing memberships:seen events now refresh the currently displayed message.
+Hints contain only room/session/source identity, never reader names or read times;
+the normal exact-message/member query supplies the evidence. Bursts coalesce over
+one second, with at most one follow-up waiting behind an admitted read/reaction.
+Queued work cannot replace a newer explicit target. Failed refreshes stay stale,
+without retry loops; source/session/room changes, backoff and opt-out fence work.
+Older watermark-only backends keep opening/explicit snapshots.
+Existing physical SDK deadlines/admission and server backoff
+remain in force. See docs/message-readers.md for proof and coverage limits.
+
+:WebexReactions        Read-only list of reactions and who sent each; <leader>Wal.
+:WebexReactionAdd      Choose an emoji; verify the exact target and send.
+:WebexReactionRemove   Remove only a freshly verified own reaction.
+Message actions keys: <leader>Wal List, <leader>Waa Add, <leader>War Remove own,
+<leader>WaI Resolve.
+From unchanged loaded history, List groups the selected message's reactions by
+emoji/label, showing names without person IDs or explanatory paragraphs.
+Clean generated lists close when leaving that space/session; annotations and
+promoted buffers are retained. q returns; / searches.
+Return to history and run the command again to refresh. Enter/write cannot react,
+remove or acknowledge anything. Missing people/counts are unknown, never zero.
+One bounded page (10 activities, the service limit), no automatic paging or directory scan; at most
+eight exact-person name lookups. Missing names show "Name unavailable". Actor details
+are not stored in automatic/disk caches or used as removal authority.
+Older backends keep the summary-only chooser. Mapping conflicts/opt-outs win.
+Existing mappings and mappings=0 take precedence; Wnr remains Remove Member.
+The Add picker opens even while a passive batch is draining; only preparation
+waits. Choosing an emoji is the complete write intent; there is no first-use/
+restart inspection gate or second confirmation. Cancel sends nothing. Remove
+submits directly when there is just one freshly verified own type; multiple
+types retain a picker. The Add picker includes Other emoji...: paste one Unicode
+emoji and press Enter to send, or leave it empty to cancel. Skin tones, flags and
+joined sequences are supported; names/text/multiple emoji are rejected by the backend.
+Read/ownership failures do not unlock or retry anything.
+Confirmed own Add/Remove results paint and cache immediately, without a space
+change or waiting for summary propagation. The affected count becomes unknown;
+no total is incremented/decremented and no removal handle is fabricated.
+Failed/unknown writes never paint a successful change. Other timestamps stay put.
+The SDK's internal conversation.activity feed exists, but cross-client reaction
+push invalidation is not wired yet; bounded periodic/details reads remain.
+:WebexReactionResolve  Recover an unknown previous write after checking Webex.
+:WebexReactionUnresolved Read-only editor-memory snapshot of pending/unknown writes.
+
+The unresolved-write list is available from any buffer, offline, with reactions
+disabled or an older backend. It shows exact room/message/original request IDs,
+not titles, message bodies, own-reaction handles or preparation context IDs.
+Use r for a local snapshot refresh, q to return, and native motions/search/copy.
+Enter/write, closing/editing this view or its row metadata never inspect, unlock,
+submit, acknowledge or replay anything. No default key family is added.
+Dismissed notices, view/room changes and backend/session resets do not discard
+the existing retained IDs. This is local evidence, not verified server/account
+state, and may predate the current backend/account. Records live in this running
+editor memory only, not across editor restart. Nothing is replayed on restart;
+check any previous unknown outcome before explicitly choosing another reaction.
+Empty means no locally retained record, not proof of server absence. Pending
+results do not auto-repaint this snapshot; rerun the command after settlement.
+Native annotations/promoted buffers and full undo are retained.
+Recovery remains separate: inspect the EXACT target in Webex, return to its
+unchanged loaded history message, then explicitly :WebexReactionResolve. The
+original request and existing confirmation/intent/result guards still apply;
+failed resolution or a stale ACK cannot retire the local unknown.
+
+Legacy names: thumbsup, heart, celebrate, smiley, haha, confused, sad.
+Only retained unknown writes require explicit inspection/recovery. They retain
+exact request identity across view changes; summaries cannot resolve them.
+No mutation retries automatically. Live mode reuses the existing read-status
+owner/grant, never another device. Live counts, complete modern vocabulary,
+cryptographic/deployment acceptance and running-editor activation are not implied.
+Current contract/evidence: docs/reactions-implementation-plan.md and
+docs/verification-index.md. Earlier R6 feasibility research is historical.
+
+NATIVE COMPLETION AND DISCOVERY                      *wbx-tui-completion*
+
+completion_policy defaults to 'manual': Ctrl-N/Ctrl-P and manually invoked
+completion functions retain native behavior and your local settings. Automatic
+providers already loaded in owned normal/reply/edit drafts are suppressed without
+loading plugins or changing global configuration. 'off' also suppresses native
+completion; 'user' explicitly releases suppression. b:wbx_completion_policy
+overrides the shared Vim/Lua option for one buffer. Promotion restores only the
+plugin's own overrides.
+
+Ex argument completion is local for WebexFormat, WebexFilter, WebexContent,
+WebexActions and existing Section choices. WebexAttach uses native file completion,
+without staging/uploading. Discovery starts no backend/provider request.
+WebexActions records effective buffer-local aliases separately from global keys.
+References/lists return to their exact initiating window and prefer this tab.
+Existing mapping groups and Wnr = Remove Member retain their meanings.
+
+LIMITS                                              *wbx-tui-limits*
+
+Plaintext sends: 1-1000 UTF-16 code units, explicit listed-space destination.
+Native thread-bound replies ARE supported, with separate normal/reply drafts.
+Received image previews, explicit bounded file uploads, own-message edit/delete,
+opt-in Markdown/mentions, recipient-first DMs, group creation/membership and lazy
+Server Teams ARE implemented offline. See |wbx-tui-message-actions| and
+|wbx-tui-conversations|. Experimental reactions: |wbx-tui-reactions|.
+Native Vim/Neovim customization/plugins are supported.
+Existing Webex personal Sections have no validated approved retrieval/export
+provider found in this review. Local sections and Server Teams remain distinct.
+R6 research is delivered in docs/reactions-research.md and
+docs/native-sections-research.md. Reaction implementation was separately approved
+against the pinned internal SDK; research alone is not runtime authorization.
+The standalone messaging TUI also has explicitly trusted executable --init
+modules, but no package installer or sandbox; JSON itself is declarative.
+No public in-meeting chat. Live sign-in/delivery/media need authorized acceptance;
+demo test success is not proof of Webex interoperability.
+
+SOURCE / VALIDATION STATUS                          *wbx-tui-pending*
+
+The messaging feature plan F1-F5 is implemented and strict offline-verified;
+The original R6 milestone delivered research only; the separately approved reaction
+runtime and later native UX work have their own isolated evidence. All new work
+remains uncommitted; the agent has not replaced checkout builds, changed installed
+configuration or reloaded/reconnected active editors.
+Current gate/evidence and live limits: docs/verification-index.md.
+
+The offline-validated follow-up adds grouped whole-thread folds, memory-only stale
+unread cache and upcoming meeting cards. Its separate verification record is
+docs/thread-cache-meetings-follow-up.md; original-roadmap totals do not cover it.
+Meeting discovery requires known-granted meeting:schedules_read (not spark:all).
+upcoming_meetings=0 disables it before connection. Up to three cards cover
+now-5 minutes through now+30 minutes; displayed Z times are UTC. Enter on a fresh
+card explicitly joins using the existing owner, transmission initially off.
+Stale cards cannot join. Webex API coverage is not a complete calendar, and no
+scope/configuration change or live join is automatic.
+
+With read_status and upcoming_meetings enabled, a separate read-only
+"Already joined elsewhere" section observes account calls joined on another
+device through the existing metadata SDK (spark:all), including exposed ad-hoc
+calls. It needs no schedule scope and never joins, transfers, leaves, selects a
+space or sends a receipt. Enter on these rows does nothing. Coverage is partial,
+not proof of absence; unsupported federation is unavailable. Event hints trigger
+throttled reads (10s minimum), with 60s reconciliation; failures/expired
+observations hide cards. No extra SDK device registration or connection is made.
+The internal SDK-service adapter carries compatibility risk and is offline-tested
+only, not live activated. See docs/upcoming-meetings.md for exact limits.
+
+The controls/folds/paging/geometry/anchors/unload guards and safety behavior above
+are IMPLEMENTED AND OFFLINE-VALIDATED in isolated builds, NOT LIVE ACTIVATED.
+Unread health uses a compact footer/statusline, not the spaces header. Historical
+flags survive same-session failures as labeled memory-only stale values; never
+observed is unknown. Stale status cannot admit receipts/reset failed attempts.
+Meeting status distinguishes receiving,
+local preview, sending, pending confirmation, failures and stale/last-reported
+observations. Inactive source labels do not claim sending. Trusted browser
+confirmation remains required; reachable controls never auto-confirm. Foreign
+tmux panes suppress automatic tiling. View closure is not proof sending stopped.
+Selected-peer presence integration, native detail ownership and unload guards are
+covered offline; custom-status text is unsupported. Live acceptance is separate.
+Current commands/evidence belong in docs/implementation-progress.md; historical
+pass totals do not establish a passing integrated build or live acceptance.
+
+REFERENCES                                          *wbx-tui-references*
+
+In the checkout: docs/editor.md (user guide), docs/architecture.md (all four
+runtime entrypoints and source/built execution), docs/editor-protocol.md (RPC),
+docs/configuration.md (engine/trusted init), docs/meeting.md (meeting CLI),
+docs/messaging.md (compatibility TUI), docs/oauth.md (authorization/retention),
+docs/people-status.md (approved presence-only subset and custom-text blocker).
+docs/editor-validation.md preserves historical synthetic results, not current
+suite counts. docs/live-acceptance.md records the approved narrow diagnostic
+reconnect/styling observations separately from NOT RUN live post/receipt/thread/
+renewal/media tests. Only safe local documentation/source-consistency checks ran
+for this alignment pass; no build, live action or installed-config change.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:

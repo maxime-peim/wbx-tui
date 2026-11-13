@@ -1,0 +1,41 @@
+{
+  "name": "wbx-tui",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "start": "node dist/cli.js",
+    "dev": "tsx scripts/dev.ts",
+    "sdk": "tsx scripts/fetch-sdk.ts",
+    "install:read-status": "npm --prefix optional/read-status-sdk ci --ignore-scripts --omit=dev",
+    "check": "tsc --noEmit",
+    "verify:plugin": "tsx scripts/verify-plugin.ts",
+    "verify:bundles": "tsx scripts/verify-bundles.ts",
+    "verify:isolated": "python3 scripts/verify-isolated.py",
+    "test": "tsx --test --test-timeout=120000 test/*.test.ts",
+    "test:browser": "tsx --test test/browser/*.test.ts",
+    "test:kitty": "tsx --test --test-concurrency=1 test/kitty/*.test.ts",
+    "test:messaging": "WBX_MESSAGING_TEST=1 tsx --test test/messaging*.test.ts test/extensions*.test.ts",
+    "test:editor": "tsx --test test/editor/*.test.ts",
+    "test:editor:client": "tsx --test test/editor/client.test.ts",
+    "test:lazyvim": "tsx --test test/lazyvim/*.test.ts"
+  },
+  "dependencies": {
+    "htmlparser2": "12.0.0",
+    "puppeteer-core": "25.16.0",
+    "string-width": "8.3.0",
+    "ws": "8.22.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "defaultModes": ["headless", "drawn"],
+  "defaultEditors": ["nvim", "vim"],
+  "editorOverrides": {"image-incremental": ["nvim"]},
+  "suites": {
+    "client": [
+      "client", "faults", "rpc-channel", "rpc-workflows", "connection", "connection-workflows", "workspace-owner", "workspace-workflows", "render-owner", "render-workflows", "render-request-owner", "delivery-render-workflows", "selection-owner", "selection-workflows", "setup-owner", "setup-workflows", "activation-owner", "activation-workflows", "send-owner", "send-workflows", "delivery-clear-owner", "delivery-clear-workflows", "delivery-ingress-owner", "delivery-ingress-workflows", "integrations", "ownership", "protocol", "contracts", "framing", "ux", "render",
+      "projection-performance", "structural-performance", "paging-performance", "status-performance", "presence-performance",
+       "keyboard", "ui", "activity", "reading", "replies", "plan-protocol", "history-features", "history-syntax-buckets", "history-timestamps",
+      "navigation-plan", "space-picker-owner", "space-picker-workflows", "grouped-navigation", "thread-subtrees", "upcoming-meetings", "meeting-action-owner", "meeting-action-workflows", "meeting-terminal-owner", "meeting-status-owner", "meeting-status-workflows", "gutter", "spaces-cache", "catalogue",
+      "media-resume", "image-renderer", "image-incremental", "image-opening", "image-terminal-hooks", "image-request-owner", "image-request-workflows", "attachments",
+      "typed-attachments", "chunked-attachments", "chunked-faults", "chunked-lifetime", "attachment-open-owner", "attachment-open-workflows", "notification-events",
+      "notifications", "notification-routing", "notification-cancellation", "local-unread-events", "local-unread",
+      "global-message-events", "notification-previews", "sender-names", "local-sections", "unread-provenance", "uploads", "mention-picker",
+      "draft-persistence", "people-viewport", "completion", "conversation-polish", "team-description", "read-by",
+      "reactions", "reaction-boundaries", "reaction-history", "reaction-anchors", "reaction-retention", "reaction-source", "reaction-quiet", "reaction-status", "reaction-unresolved", "reaction-text", "reaction-return", "team-description-boundaries", "team-rename", "team-rename-boundaries", "member-visibility", "member-visibility-boundaries",
+      "space-moderator-gate", "space-moderator-gate-boundaries", "space-description-clear", "space-description-clear-boundaries",
+      "space-announcement", "space-announcement-boundaries", "space-lock", "space-lock-boundaries", "space-description",
+      "space-description-boundaries", "space-rename", "space-rename-boundaries", "direct-rich-files", "direct-rich-boundaries",
+      "rich-uploads", "rich-upload-boundaries", "upload-notifications", "native-confirmations", "message-actions", "conversations", "people-ownership", "people-details",
+      "ui-review", "people-spaces", "people-popup", "notification-visibility", "notification-fallback", "action-catalogue", "draft-workflows",
+       "mutation-recovery", "organization-workflows", "list-boundaries", "conversation-recovery", "conversation-reset-recovery", "sdk-native-recovery", "meeting-workflows",
+      "delivery-resolution", "delivery-recovery-owner", "delivery-recovery-workflows", "parity-local", "parity-boundaries", "directory-workflows", "directory-boundaries",
+      "message-query-workflows", "message-query-boundaries", "profile-workflows", "profile-boundaries", "card-text",
+      "joined-teams-workflows", "joined-teams-boundaries"
+    ],
+    "cache-wrap": ["people-cache", "mention-wrapping"],
+    "review-remediation": ["recovery-safety", "mention-consent", "viewport-work", "picker-safety", "policy-contracts", "saved-drafts", "feature-negotiation", "presence-repaint", "native-choosers"]
+  },
+  "headlessOnly": {
+    "client": "Transport/editing lifecycle; layout behavior has separate drawn fixtures.",
+    "integrations": "Neovim Lua integration adapter plus Vim unsupported path; not a drawn layout claim.",
+    "ownership": "Native promotion/ownership lifecycle; not a drawn layout claim.",
+    "ux": "Mapping and buffer option contracts; drawn keyboard/ui fixtures cover visible behavior.",
+    "render": "Pure row projection contracts; drawn history fixtures cover visible behavior.",
+    "presence-performance": "Synthetic catalogue validation/cache regression and timings; no displayed behavior is claimed.",
+    "plan-protocol": "Protocol rejection matrix; no drawn behavior claimed.",
+    "notification-events": "Synthetic event policy; not a drawn layout claim.",
+    "local-unread-events": "Synthetic local unread policy; not a drawn layout claim.",
+    "notification-fallback": "Unsupported notification route; not a drawn layout claim.",
+    "policy-contracts": "Pure language-neutral DTO parity; no displayed behavior is claimed.",
+    "feature-negotiation": "Handshake validation and lifecycle admission; no drawn layout claim."
+  },
+  "restart": ["draft-persistence"],
+  "mediaOptIn": ["meeting", "fallback", "shutdown"],
+  "excluded": {
+    "history-benchmark": "Manual timing harness; bounded structural/projection fixtures are acceptance.",
+    "history-syntax-performance": "Manual historical timing harness; history-syntax-buckets is acceptance.",
+    "performance": "Manual benchmark consumed by editor-performance unit checks, not a standalone acceptance cell.",
+    "showcase": "Manual screenshot/demo recipe, not acceptance."
+  }
+}

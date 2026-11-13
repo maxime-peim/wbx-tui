@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "limits": {
+    "requestBytes": 32768,
+    "eventBytes": 8388608,
+    "originalBytes": 6000000,
+    "rasterBytes": 8388608,
+    "pngBytes": 6000000,
+    "textBytes": 1048576,
+    "textLines": 20000,
+    "chunkBytes": 49152,
+    "chunkRecordBytes": 69632,
+    "controlBytes": 8192,
+    "selectorEntries": 128,
+    "selectorBytes": 24576
+  },
+  "utf8": [
+    { "text": "a", "bytes": 1, "codePoints": 1 },
+    { "text": "界", "bytes": 3, "codePoints": 1 },
+    { "text": "👩🏽‍💻", "bytes": 15, "codePoints": 4 },
+    { "text": "é", "bytes": 3, "codePoints": 2 }
+  ],
+  "canonical": [
+    { "data": "", "bytes": 0, "valid": true },
+    { "data": "AA==", "bytes": 1, "valid": true },
+    { "data": "AB==", "bytes": 1, "valid": false },
+    { "data": "AAA=", "bytes": 2, "valid": true },
+    { "data": "AAB=", "bytes": 2, "valid": false },
+    { "data": "AAAA", "bytes": 3, "valid": true },
+    { "data": "AA", "bytes": 1, "valid": false },
+    { "data": "_w==", "bytes": 1, "valid": false }
+  ],
+  "encoded": [
+    { "bytes": 0, "base64Bytes": 0, "chunks": 0 },
+    { "bytes": 1, "base64Bytes": 4, "chunks": 1 },
+    { "bytes": 49152, "base64Bytes": 65536, "chunks": 1 },
+    { "bytes": 49153, "base64Bytes": 65540, "chunks": 2 },
+    { "bytes": 6000000, "base64Bytes": 8000000, "chunks": 123 }
+  ]
+}

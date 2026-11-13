@@ -1,0 +1,21 @@
+{
+  "name": "wbx-tui-optional-read-status-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Optional metadata-only Webex SDK runtime; never loaded by the baseline editor engine",
+  "dependencies": {
+    "@babel/runtime-corejs2": "7.29.7",
+    "@webex/internal-plugin-device": "3.13.0",
+    "@webex/plugin-authorization": "3.13.0",
+    "@webex/plugin-logger": "3.13.0",
+    "@webex/plugin-memberships": "3.13.0",
+    "@webex/plugin-messages": "3.13.0",
+    "@webex/plugin-people": "3.13.0",
+    "@webex/plugin-rooms": "3.13.0",
+    "@webex/webex-core": "3.13.0"
+  },
+  "overrides": {
+    "form-data": "2.5.6"
+  }
+}
